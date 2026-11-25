@@ -115,7 +115,9 @@ function saveKey_(key) {
   }
   const days = {};
   for (const p of key.order) {
-    const d = key.days && key.days[p];
+    const d = key.days ? key.days[p] : null;
+    // null (or missing) means "TBD": the step counts for order but not for days.
+    if (d === null || d === undefined) { days[p] = null; continue; }
     if (!Number.isInteger(d) || d < 0 || d > 999) return json({ ok: false, error: "bad_request" });
     days[p] = d;
   }

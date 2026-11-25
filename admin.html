@@ -44,7 +44,7 @@
 
     <details class="card keypanel" id="keyPanel">
       <summary>Answer key and scoring</summary>
-      <p class="rules" style="margin-top:12px">Set each phase’s correct position and number of days. Sequence: full credit in the right place, two-thirds one place off, one-third two places off. Days: credit falls in a straight line to zero at 100% off.</p>
+      <p class="rules" style="margin-top:12px">Set each phase’s correct position and number of days. Sequence: full credit in the right place, two-thirds one place off, one-third two places off. Days: credit falls in a straight line to zero at 100% off. Leave days blank for a TBD step; it then counts for order only.</p>
       <div class="keyrow keyhead"><span>Phase</span><span>Position</span><span>Days</span></div>
       <div class="keyrows" id="keyRows"></div>
       <label class="weight"><span>Balance: <output id="weightOut"></output></span><input type="range" id="weight" min="0" max="100" step="10" value="50"></label>
@@ -57,7 +57,7 @@
   </section>
 </main>
 
-<script src="config.js?v=14"></script>
+<script src="config.js?v=15"></script>
 <script src="shared.js?v=5"></script>
 <script>
 const { cfg, api, $, setMsg, summaryList, label } = window.Quiz;
@@ -128,7 +128,7 @@ function applyData(){
   if(!key) $("keyPanel").open = true;
   if(keyStale && !keyDirty){
     const added=PHASES.filter(p=>!saved.order.includes(p)).map(label);
-    setMsg($("keyMsg"), `The steps changed since this key was saved${added.length?` (new: ${added.join(", ")})`:""}. Check the positions, fill in any missing days, then save to score the teams.`, true);
+    setMsg($("keyMsg"), `The steps changed since this key was saved${added.length?` (new: ${added.join(", ")})`:""}. Check the positions and days (leave blank for TBD), then save to score the teams.`, true);
   }
   const open = data.open !== false;
   $("statusLabel").textContent = open ? "Submissions open" : "Submissions closed";
@@ -157,14 +157,18 @@ $("roundBtn").onclick=async()=>{
 /* ---------- Scoring ---------- */
 function scoreSub(s,k){
   const steps=s.steps||[], n=k.order.length;
+  // Steps with days left blank (TBD) count for order only.
+  const timed=k.order.filter(p=>Number.isInteger(k.days[p])).length;
   let o=0,d=0;
   steps.forEach((st,gi)=>{
     const ci=k.order.indexOf(st.phase); if(ci<0) return;
     o+=Math.max(0,1-Math.abs(gi-ci)/3);
     const c=k.days[st.phase], g=st.days;
+    if(!Number.isInteger(c)) return;
     d+= c===0 ? (g===0?1:0) : Math.max(0,1-Math.abs(g-c)/c);
   });
-  const orderPct=o/n*100, daysPct=d/n*100, w=(k.orderWeight??50)/100;
+  const orderPct=o/n*100, daysPct=timed ? d/timed*100 : 0;
+  const w = timed ? (k.orderWeight??50)/100 : 1;
   return {orderPct,daysPct,total:w*orderPct+(1-w)*daysPct};
 }
 
@@ -184,7 +188,7 @@ function renderKeyForm(){
     const sel=row.querySelector("select");
     for(let n=1;n<=PHASES.length;n++){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===pos) o.selected=true; sel.appendChild(o); }
     sel.setAttribute("aria-label",`Correct position for ${label(p)}`);
-    const inp=row.querySelector("input"); inp.value=days; inp.setAttribute("aria-label",`Correct days for ${label(p)}`);
+    const inp=row.querySelector("input"); inp.value=days; inp.placeholder="TBD"; inp.setAttribute("aria-label",`Correct days for ${label(p)}`);
     inp.addEventListener("input",()=>{ inp.value=inp.value.replace(/\D/g,"").slice(0,3); keyDirty=true; });
     sel.addEventListener("change",()=>{ keyDirty=true; });
     rows.appendChild(row);
@@ -202,14 +206,13 @@ $("saveKey").onclick=async()=>{
   if(new Set(pos).size!==PHASES.length){
     setMsg(msg,`Each position can be used once. Check positions ${[...new Set(pos.filter((v,i)=>pos.indexOf(v)!==i))].join(", ")}.`,true); return;
   }
-  const days={}, missing=[];
-  rows.forEach(r=>{ const v=r.querySelector("input").value; if(v==="") missing.push(label(r.dataset.phase)); else days[r.dataset.phase]=parseInt(v,10); });
-  if(missing.length){ setMsg(msg,`Add days for ${missing.join(", ")}.`,true); return; }
+  const days={}, tbd=[];
+  rows.forEach(r=>{ const v=r.querySelector("input").value; if(v==="") { tbd.push(label(r.dataset.phase)); days[r.dataset.phase]=null; } else days[r.dataset.phase]=parseInt(v,10); });
   const order=rows.map((r,i)=>({p:r.dataset.phase,pos:pos[i]})).sort((a,b)=>a.pos-b.pos).map(x=>x.p);
   const btn=$("saveKey"); btn.disabled=true; btn.textContent="Saving…";
   try{
     await api({action:"saveKey", password, key:{order,days,orderWeight:+$("weight").value}});
-    keyDirty=false; setMsg(msg,"Answer key saved. Scores below are updated.");
+    keyDirty=false; setMsg(msg, tbd.length ? `Answer key saved. Days are TBD for ${tbd.join(", ")}, so ${tbd.length===1?"that step counts":"those steps count"} for order only.` : "Answer key saved. Scores below are updated.");
     await refresh(true);
   }catch(e){ setMsg(msg,"The answer key didn’t save. Try again.",true); }
   finally{ btn.disabled=false; btn.textContent="Save answer key"; }
@@ -225,8 +228,8 @@ function scoredList(el,s,k){
     li.children[1].textContent=label(st.phase);
     li.children[2].textContent=`${st.days} d`;
     const a=li.children[3];
-    a.textContent=`answer: #${ci}, ${c} d`;
-    if(ci===i+1 && c===st.days) a.classList.add("ok");
+    a.textContent=`answer: #${ci}, ${Number.isInteger(c)?c+" d":"TBD"}`;
+    if(ci===i+1 && (c===st.days || !Number.isInteger(c))) a.classList.add("ok");
     el.appendChild(li);
   });
 }
