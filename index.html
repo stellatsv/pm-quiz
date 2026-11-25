@@ -33,8 +33,7 @@
     <ol class="steps" id="steps"></ol>
     <div class="foot">
       <div class="totals">
-        <div class="total" id="total">0<small>days</small></div>
-        <div class="hint" id="hint"></div>
+        <div class="hint" id="hint" style="text-align:left"></div>
       </div>
       <div class="track" id="track" aria-hidden="true"></div>
       <button class="primary" id="submitBtn" disabled>Submit answer</button>
@@ -280,9 +279,8 @@ function updateFooter(){
   const vals=state.order.map(p=>state.days[p]);
   const filled=vals.filter(v=>Number.isInteger(v)).length;
   const total=vals.reduce((s,v)=>s+(Number.isInteger(v)?v:0),0);
-  $("total").innerHTML=`${total}<small>${total===1?"day":"days"} in total</small>`;
   const missing=PHASES.length-filled;
-  $("hint").textContent = missing ? `Add days for ${missing} more ${missing===1?"step":"steps"}` : `About ${Math.round(total/5*10)/10} working weeks`;
+  $("hint").textContent = missing ? `Add days for ${missing} more ${missing===1?"step":"steps"}` : "Every step has days. Ready to submit.";
   const track=$("track"); track.innerHTML="";
   const cols=["--seg1","--seg2","--seg3","--seg4"];
   state.order.forEach((p,i)=>{
@@ -312,8 +310,7 @@ $("submitBtn").onclick=async()=>{
 
 function renderDone(){
   const steps=state.order.map(p=>({phase:p,days:state.days[p]}));
-  const total=steps.reduce((s,x)=>s+x.days,0);
-  $("doneLede").textContent=`${state.team}’s answer is in: ${total} days end to end. You can change it until the host closes submissions; your latest answer is the one that counts.`;
+  $("doneLede").textContent=`${state.team}’s answer is in. You can change it until the host closes submissions; your latest answer is the one that counts.`;
   summaryList($("doneSummary"),steps);
 }
 $("editBtn").onclick=()=>{ renderSteps(); show("play"); };
