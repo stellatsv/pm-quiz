@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=20261125172713">
 </head>
 <body>
 <div class="bar">
@@ -81,8 +81,26 @@
   </section>
 </main>
 
-<script src="config.js?v=17"></script>
-<script src="shared.js?v=8"></script>
+<script>
+// Reload once when a newer version of the site has been published (browsers may cache pages for ~10 min).
+window.BUILD=20261125172713;
+(function(){
+  function busy(){ var a=document.activeElement; return document.body && (document.body.classList.contains("is-dragging") || (a && a.tagName==="INPUT")); }
+  function check(){
+    fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(v){
+      if(!v || !(v.build>window.BUILD) || busy()) return;
+      var k="reloaded-"+v.build;
+      try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,"1"); }catch(e){}
+      location.reload();
+    }).catch(function(){});
+  }
+  check();
+  setInterval(function(){ if(document.visibilityState==="visible") check(); },60000);
+  document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible") check(); });
+})();
+</script>
+<script src="config.js?v=20261125172713"></script>
+<script src="shared.js?v=20261125172713"></script>
 <script>
 const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub, teamRows } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
