@@ -5,7 +5,7 @@ window.QUIZ_CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbw4sqbtBSvx5zu1hKkk0Q5vJvvydbgXhI65n1rpntmVnRgtBz4an8DkHBlhXuPU43Tr/exec",
 
   // Team names shown on the first screen.
-  TEAMS: ["IT-Ops", "PMM", "SA", "NET", "EIT", "DevOps", "Support", "CNT", "DM", "AM", "PM", "Sales", "Pre-Sales", "Management"],
+  TEAMS: ["PMM", "SA", "NET", "EIT", "DevOps", "Support", "DM", "AM", "Sales", "Pre-Sales", "Management"],
 
   // How a phase is shown on screen, if different from its name below.
   // Renaming here needs no change to the Apps Script.
