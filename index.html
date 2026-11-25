@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 <div class="bar">
@@ -71,6 +71,10 @@
       <div><span class="big" id="resTotal">0</span><span class="unit">points out of 100</span></div>
       <div class="splits"><span id="resOrder"></span><span id="resDays"></span></div>
     </div>
+    <div id="lbWrap" hidden>
+      <h2>Team leaderboard</h2>
+      <ol class="lb" id="lb"></ol>
+    </div>
     <h2>The correct sequence</h2>
     <p class="legend"><span class="swatch"></span>Highlighted: what you got wrong</p>
     <ol class="cklist" id="resList"></ol>
@@ -78,9 +82,9 @@
 </main>
 
 <script src="config.js?v=17"></script>
-<script src="shared.js?v=7"></script>
+<script src="shared.js?v=8"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub, teamRows } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const STORE_KEY = "delivery-quiz-gh-v1";
 
@@ -229,6 +233,22 @@ function renderResults(k){
     ol.appendChild(li);
   });
 }
+function renderLeaderboard(subs,k){
+  const wrap=$("lbWrap");
+  if(!Array.isArray(subs) || !subs.length){ wrap.hidden=true; return; }
+  const ol=$("lb"); ol.innerHTML="";
+  teamRows(subs,k).forEach((r,i)=>{
+    const li=document.createElement("li");
+    li.className="lbrow"+(i===0?" top":"")+(r.t===state.team?" mine":"");
+    li.innerHTML=`<span class="rk"></span><span class="tm"></span><span class="pp"></span><span class="sc"></span>`;
+    li.querySelector(".rk").textContent=i+1;
+    li.querySelector(".tm").textContent=r.t+(r.t===state.team?" (your team)":"");
+    li.querySelector(".pp").textContent=`${r.members.length} ${r.members.length===1?"person":"people"}`;
+    li.querySelector(".sc").textContent=r.total.toFixed(1);
+    ol.appendChild(li);
+  });
+  wrap.hidden=false;
+}
 function renderClosedKey(k){
   const wrap=$("closedKeyWrap");
   if(!k){ wrap.hidden=true; return; }
@@ -272,7 +292,7 @@ async function checkStatus(){
     }
     if(r.open===false){
       wasClosed=true;
-      if(r.key && state.lastSubmit){ renderResults(r.key); show("results"); }
+      if(r.key && state.lastSubmit){ renderResults(r.key); renderLeaderboard(r.submissions,r.key); show("results"); }
       else { renderClosedKey(r.key); show("closed"); }
     }
     else if(wasClosed || !$("view-closed").hidden){ wasClosed=false; route(); }

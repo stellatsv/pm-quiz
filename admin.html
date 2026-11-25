@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 <div class="bar">
@@ -58,9 +58,9 @@
 </main>
 
 <script src="config.js?v=17"></script>
-<script src="shared.js?v=7"></script>
+<script src="shared.js?v=8"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub, teamRows } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const PW_KEY = "delivery-quiz-admin-pw";
 
@@ -258,37 +258,12 @@ function renderResults(){
   box.innerHTML=""; board.innerHTML="";
   const subs=(data && data.submissions)||[];
 
-  // Group by team, then by person (one browser = one person); each person's latest answer counts.
-  const byTeam={};
-  subs.forEach(s=>{
-    const t=(byTeam[s.team]=byTeam[s.team]||{});
-    const id=s.clientId||("anon-"+s.submittedAt);
-    (t[id]=t[id]||[]).push(s);
-  });
-  const teams=TEAMS.filter(t=>byTeam[t]).concat(Object.keys(byTeam).filter(t=>!TEAMS.includes(t)));
-  const people=teams.reduce((n,t)=>n+Object.keys(byTeam[t]).length,0);
-  $("resultsLede").textContent=`${teams.length} of ${TEAMS.length} teams have answered (${people} ${people===1?"person":"people"}). Updates every 15 seconds.`;
-  if(!teams.length){ box.innerHTML='<div class="empty-state">No answers yet this round. Share the quiz link with the teams to get started.</div>'; return; }
-
-  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
-  const rows=teams.map(t=>{
-    // Number members in the order they first submitted
-    const members=Object.values(byTeam[t]).map(list=>{
-      list.sort((a,b)=>b.submittedAt-a.submittedAt);
-      return {s:list[0], first:list[list.length-1].submittedAt, count:list.length};
-    }).sort((a,b)=>a.first-b.first);
-    members.forEach((m,i)=>{ m.name=`${t} #${i+1}`; m.sc=key?scoreSub(m.s,key):null; });
-    const team={t,members,last:Math.max(...members.map(m=>m.s.submittedAt))};
-    if(key){
-      team.total=avg(members.map(m=>m.sc.total));
-      team.orderPct=avg(members.map(m=>m.sc.orderPct));
-      team.daysPct=avg(members.map(m=>m.sc.daysPct));
-    }
-    return team;
-  });
+  const rows=teamRows(subs,key);
+  const people=rows.reduce((n,r)=>n+r.members.length,0);
+  $("resultsLede").textContent=`${rows.length} of ${TEAMS.length} teams have answered (${people} ${people===1?"person":"people"}). Updates every 15 seconds.`;
+  if(!rows.length){ box.innerHTML='<div class="empty-state">No answers yet this round. Share the quiz link with the teams to get started.</div>'; return; }
 
   if(key){
-    rows.sort((a,b)=>b.total-a.total || a.last-b.last);
     const wrap=document.createElement("div"); wrap.className="boardwrap";
     const tbl=document.createElement("table"); tbl.className="board";
     tbl.innerHTML=`<thead><tr><th class="t">#</th><th class="t">Team</th><th>Avg score</th><th>Sequence</th><th>Days</th><th>People</th></tr></thead><tbody></tbody>`;

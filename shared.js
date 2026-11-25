@@ -232,5 +232,35 @@
     return { orderPct, daysPct, total: w * orderPct + (1 - w) * daysPct };
   }
 
-  window.Quiz = { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub };
+  // Group submissions by team, then by person (one browser = one person; their latest
+  // answer counts). With a key, each team's score is the average of its members.
+  function teamRows(subs, k) {
+    const byTeam = {};
+    subs.forEach(s => {
+      const t = (byTeam[s.team] = byTeam[s.team] || {});
+      const id = s.clientId || ("anon-" + s.submittedAt);
+      (t[id] = t[id] || []).push(s);
+    });
+    const known = cfg.TEAMS || [];
+    const teams = known.filter(t => byTeam[t]).concat(Object.keys(byTeam).filter(t => !known.includes(t)));
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const rows = teams.map(t => {
+      const members = Object.values(byTeam[t]).map(list => {
+        list.sort((a, b) => b.submittedAt - a.submittedAt);
+        return { s: list[0], first: list[list.length - 1].submittedAt, count: list.length };
+      }).sort((a, b) => a.first - b.first);
+      members.forEach((m, i) => { m.name = `${t} #${i + 1}`; m.sc = k ? scoreSub(m.s, k) : null; });
+      const team = { t, members, last: Math.max(...members.map(m => m.s.submittedAt)) };
+      if (k) {
+        team.total = avg(members.map(m => m.sc.total));
+        team.orderPct = avg(members.map(m => m.sc.orderPct));
+        team.daysPct = avg(members.map(m => m.sc.daysPct));
+      }
+      return team;
+    });
+    if (k) rows.sort((a, b) => b.total - a.total || a.last - b.last);
+    return rows;
+  }
+
+  window.Quiz = { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub, teamRows };
 })();

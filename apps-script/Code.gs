@@ -84,7 +84,8 @@ function submit_(req) {
 
 /* ---------- Admin ---------- */
 
-function results_() {
+// Answers submitted since the current round started.
+function roundSubmissions_() {
   const resetAt = Number(props_().getProperty("RESET_AT") || 0);
   const values = sheet_().getDataRange().getValues();
   const submissions = [];
@@ -96,6 +97,12 @@ function results_() {
     try { steps = JSON.parse(row[4]); } catch (err) { continue; }
     submissions.push({ submittedAt: at, team: String(row[1]), total: Number(row[2]), clientId: String(row[3]), steps: steps });
   }
+  return submissions;
+}
+
+function results_() {
+  const resetAt = Number(props_().getProperty("RESET_AT") || 0);
+  const submissions = roundSubmissions_();
   const keyRaw = props_().getProperty("KEY");
   return json({
     ok: true,
@@ -168,7 +175,11 @@ function status_() {
   const out = { ok: true, open: open, round: Number(props_().getProperty("RESET_AT") || 0) };
   if (!open) {
     const keyRaw = props_().getProperty("KEY");
-    if (keyRaw) out.key = JSON.parse(keyRaw);
+    if (keyRaw) {
+      out.key = JSON.parse(keyRaw);
+      // Anonymous answers (team + steps) so phones can build the team leaderboard.
+      out.submissions = roundSubmissions_().map(s => ({ submittedAt: s.submittedAt, team: s.team, clientId: s.clientId, steps: s.steps }));
+    }
   }
   return out;
 }
