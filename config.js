@@ -7,6 +7,10 @@ window.QUIZ_CONFIG = {
   // Team names shown on the first screen.
   TEAMS: ["IT-Ops", "PMM", "SA", "NET", "EIT", "DevOps", "Support", "CNT", "DM", "AM", "PM", "Sales", "Pre-Sales", "Management"],
 
+  // How a phase is shown on screen, if different from its name below.
+  // Renaming here needs no change to the Apps Script.
+  PHASE_LABELS: { "Launch": "Launch Actions" },
+
   // The phases participants put in order. If you change these, change PHASES in Code.gs too.
   PHASES: [
     "Engagement Checklist", "SD Creation", "Project Plan", "Content Preparation",

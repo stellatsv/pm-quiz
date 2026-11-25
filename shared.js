@@ -26,6 +26,7 @@
   }
 
   const $ = id => document.getElementById(id);
+  const label = p => (cfg.PHASE_LABELS && cfg.PHASE_LABELS[p]) || p;
 
   function setMsg(el, text, err) {
     el.hidden = !text; el.textContent = text || ""; el.classList.toggle("err", !!err);
@@ -36,11 +37,11 @@
     steps.forEach((s, i) => {
       const li = document.createElement("li");
       li.innerHTML = `<span class="n">${i + 1}</span><span></span><span class="d"></span>`;
-      li.children[1].textContent = s.phase;
+      li.children[1].textContent = label(s.phase);
       li.children[2].textContent = `${s.days} ${s.days === 1 ? "day" : "days"}`;
       el.appendChild(li);
     });
   }
 
-  window.Quiz = { cfg, api, $, setMsg, summaryList };
+  window.Quiz = { cfg, api, $, setMsg, summaryList, label };
 })();

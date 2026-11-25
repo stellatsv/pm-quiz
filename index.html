@@ -59,10 +59,10 @@
   </section>
 </main>
 
-<script src="config.js?v=4"></script>
-<script src="shared.js?v=2"></script>
+<script src="config.js?v=5"></script>
+<script src="shared.js?v=5"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const STORE_KEY = "delivery-quiz-gh-v1";
 
@@ -112,9 +112,9 @@ function renderSteps(){
   state.order.forEach(phase=>{
     const li=document.createElement("li"); li.className="step"; li.dataset.phase=phase;
     li.innerHTML=`<button class="grip" type="button">${GRIP}</button><span class="num"></span><span class="name"></span><label class="days"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off"><span>days</span></label>`;
-    li.querySelector(".name").textContent=phase;
+    li.querySelector(".name").textContent=label(phase);
     const input=li.querySelector("input");
-    input.setAttribute("aria-label",`Days for ${phase}`);
+    input.setAttribute("aria-label",`Days for ${label(phase)}`);
     input.value = state.days[phase] ?? "";
     input.addEventListener("input",()=>{
       input.value=input.value.replace(/\D/g,"").slice(0,3);
@@ -134,7 +134,7 @@ function renderSteps(){
 function renumber(){
   [...$("steps").children].forEach((li,i)=>{
     li.querySelector(".num").textContent=i+1;
-    li.querySelector(".grip").setAttribute("aria-label",`Move ${li.dataset.phase}, currently step ${i+1} of ${PHASES.length}. Use the up and down arrow keys.`);
+    li.querySelector(".grip").setAttribute("aria-label",`Move ${label(li.dataset.phase)}, currently step ${i+1} of ${PHASES.length}. Use the up and down arrow keys.`);
   });
 }
 function syncOrder(){ state.order=[...$("steps").children].map(li=>li.dataset.phase); save(); renumber(); updateFooter(); }
@@ -288,7 +288,7 @@ function updateFooter(){
   state.order.forEach((p,i)=>{
     const v=state.days[p]; if(!v||!total) return;
     const s=document.createElement("div"); s.className="seg";
-    s.style.width=(v/total*100)+"%"; s.style.background=`var(${cols[i%4]})`; s.title=`${i+1}. ${p}: ${v} days`;
+    s.style.width=(v/total*100)+"%"; s.style.background=`var(${cols[i%4]})`; s.title=`${i+1}. ${label(p)}: ${v} days`;
     track.appendChild(s);
   });
   $("submitBtn").disabled = missing>0;
