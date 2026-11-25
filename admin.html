@@ -212,7 +212,12 @@ $("saveKey").onclick=async()=>{
     await api({action:"saveKey", password, key:{order,days,orderWeight:+$("weight").value}});
     keyDirty=false; setMsg(msg, tbd.length ? `Answer key saved. Days are TBD for ${tbd.join(", ")}, so ${tbd.length===1?"that step counts":"those steps count"} for order only.` : "Answer key saved. Scores below are updated.");
     await refresh(true);
-  }catch(e){ setMsg(msg,"The answer key didn’t save. Try again.",true); }
+  }catch(e){
+    setMsg(msg, e.code==="bad_request"
+      ? "Google rejected this key, which usually means the Apps Script is out of date. Paste the latest Code.gs from GitHub, then Deploy → Manage deployments → Edit → New version → Deploy."
+      : e.code==="unauthorized" ? "Your admin password changed. Sign out and sign in again."
+      : "The answer key didn’t save. Check your connection and try again.", true);
+  }
   finally{ btn.disabled=false; btn.textContent="Save answer key"; }
 };
 

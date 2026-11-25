@@ -162,6 +162,7 @@ $("submitBtn").onclick=async()=>{
   }catch(err){
     if(err.code==="closed"){ show("closed"); }
     else if(err.code==="not_configured"){ setMsg(msg,"This quiz isn’t connected to its answer sheet yet. Ask the host to finish setup.",true); }
+    else if(err.code==="bad_request"){ setMsg(msg,"The quiz couldn’t accept this answer. Please let the host know.",true); }
     else { setMsg(msg,"The answer didn’t save. Check your connection and select Submit answer again.",true); }
   }finally{ btn.textContent="Submit answer"; updateFooter(); }
 };
