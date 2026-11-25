@@ -34,13 +34,15 @@ No sign-in is needed to take the quiz. The admin password is checked by Google A
 ## Running the quiz
 1. Open the admin page, sign in, and fill in **Answer key and scoring** (positions, days, and the sequence/days balance). Save.
 2. Share the quiz link with the teams. Answers appear on the admin page within 15 seconds.
-3. Select **Close submissions** when time is up. Teams then see a "Submissions are closed" message and can't change their answers.
+3. Select **Close submissions** when time is up. Within about 20 seconds, everyone who submitted sees their personal results: their score and, for each step, whether they had the right position and days, with the correct answer. Anyone who didn't submit sees the correct order.
 4. To run it again, select **Start a new round** (clears the board) and **Reopen submissions**.
 
 Every answer is also kept as a row in the **Submissions** tab of your Google Sheet, including earlier rounds.
 
 ## Scoring
 - **Sequence (per phase):** full credit in the right position, two-thirds if one place off, one-third if two places off, nothing beyond that.
+- **Any order blocks:** on the admin page, mark neighbouring steps **Any order** to accept them in any arrangement within their positions. A step placed outside its block is scored by its distance from the nearest edge of the block.
+- **Days left blank (TBD)** count for order only.
 - **Days (per phase):** credit falls in a straight line with the size of the miss, reaching zero at 100% off. If the answer is 10 days, 15 or 5 earns half credit.
 - **Score:** a weighted mix of the two, out of 100. Ties go to the team that submitted first.
 

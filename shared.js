@@ -197,5 +197,40 @@
 
   const GRIP = '<svg viewBox="0 0 14 20" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="2"/><circle cx="11" cy="3" r="2"/><circle cx="3" cy="10" r="2"/><circle cx="11" cy="10" r="2"/><circle cx="3" cy="17" r="2"/><circle cx="11" cy="17" r="2"/></svg>';
 
-  window.Quiz = { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP };
+  /* ---------- Scoring (same on the admin page and the participant results page) ---------- */
+  // The range of correct positions (0-based) for a phase: one slot, or a whole
+  // "any order" block when the phase belongs to one of the key's groups.
+  function block(p, k) {
+    const ci = k.order.indexOf(p); if (ci < 0) return null;
+    const g = (k.groups || []).find(g => g.includes(p));
+    if (!g) return { lo: ci, hi: ci };
+    const idx = g.map(q => k.order.indexOf(q)).filter(i => i >= 0);
+    return { lo: Math.min(...idx), hi: Math.max(...idx) };
+  }
+  const posLabel = b => b.lo === b.hi ? `#${b.lo + 1}` : `#${b.lo + 1}–${b.hi + 1}`;
+
+  function stepResult(st, gi, k) {
+    const b = block(st.phase, k); if (!b) return null;
+    const dist = gi < b.lo ? b.lo - gi : gi > b.hi ? gi - b.hi : 0;
+    const c = k.days[st.phase], timed = Number.isInteger(c);
+    const daysCredit = !timed ? null : c === 0 ? (st.days === 0 ? 1 : 0) : Math.max(0, 1 - Math.abs(st.days - c) / c);
+    return { b, dist, orderCredit: Math.max(0, 1 - dist / 3), c, timed, daysCredit, daysOk: !timed || st.days === c };
+  }
+
+  function scoreSub(s, k) {
+    const steps = s.steps || [], n = k.order.length;
+    // Steps with days left blank (TBD) count for order only.
+    const timed = k.order.filter(p => Number.isInteger(k.days[p])).length;
+    let o = 0, d = 0;
+    steps.forEach((st, gi) => {
+      const r = stepResult(st, gi, k); if (!r) return;
+      o += r.orderCredit;
+      if (r.timed) d += r.daysCredit;
+    });
+    const orderPct = o / n * 100, daysPct = timed ? d / timed * 100 : 0;
+    const w = timed ? (k.orderWeight ?? 50) / 100 : 1;
+    return { orderPct, daysPct, total: w * orderPct + (1 - w) * daysPct };
+  }
+
+  window.Quiz = { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub };
 })();

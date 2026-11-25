@@ -174,3 +174,27 @@ mark.hl{white-space:nowrap;background:var(--accent);color:var(--accent-ink);font
 .member[open] summary .who::before{transform:rotate(90deg)}
 .member .mscore{color:var(--accent-text);font-variant-numeric:tabular-nums}
 .member .summary{margin:8px 0 12px}
+
+/* Participant results */
+.resscore{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px;border-radius:12px;background:var(--soft);border-left:4px solid var(--accent);margin:8px 0 14px}
+.resscore .big{font:400 3.25rem/1 var(--head);color:var(--accent-text);font-variant-numeric:tabular-nums}
+.resscore .unit{display:block;font-size:.875rem;color:var(--muted);margin-top:4px}
+.resscore .splits{display:flex;gap:14px;font-weight:700;color:var(--body-ink)}
+.legend{font-size:.875rem;color:var(--muted);margin:0 0 8px}
+.okmark{color:var(--accent-text);font-weight:700}
+.xmark{color:var(--danger);font-weight:700}
+.reslist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.res{display:grid;grid-template-columns:28px 1fr;gap:8px;padding:12px 14px 12px 10px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;background:var(--surface)}
+.res.has-miss{border-left-color:var(--danger)}
+.res .n{font:700 .9375rem var(--head);color:var(--accent-text);font-variant-numeric:tabular-nums;text-align:right;padding-top:1px}
+.res .nm{font-weight:700;line-height:1.25}
+.res .lines{display:flex;flex-direction:column;gap:2px;margin-top:4px;font-size:.875rem}
+.res .ok{color:var(--accent-text);font-weight:600}
+.res .miss{color:var(--danger);font-weight:600}
+.res .tbd{color:var(--muted)}
+
+/* Admin answer key: any-order toggle */
+.keyname{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.flex{font:600 .75rem/1 var(--body);padding:5px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.flex[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.step.flexed{background:var(--cream)}

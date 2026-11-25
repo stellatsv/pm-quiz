@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <div class="bar">
@@ -55,14 +55,31 @@
   <section id="view-closed" hidden>
     <span class="tag">Dev Summit 2026</span>
     <h1>Submissions are <mark class="hl">closed</mark></h1>
-    <p class="lede">The host has closed this round. Hang tight for the results.</p>
+    <p class="lede" id="closedLede">The host has closed this round. Hang tight for the results.</p>
+    <div id="closedKeyWrap" hidden>
+      <h2>The correct order</h2>
+      <ol class="summary" id="closedKey"></ol>
+    </div>
+  </section>
+
+  <!-- 5. Results (after the host closes submissions) -->
+  <section id="view-results" hidden>
+    <span class="tag">Dev Summit 2026 · Results</span>
+    <h1>Your <mark class="hl">results</mark></h1>
+    <p class="lede" id="resLede"></p>
+    <div class="resscore">
+      <div><span class="big" id="resTotal">0</span><span class="unit">points out of 100</span></div>
+      <div class="splits"><span id="resOrder"></span><span id="resDays"></span></div>
+    </div>
+    <p class="legend"><span class="okmark">✓</span> right &nbsp; <span class="xmark">✗</span> off, with the correct answer</p>
+    <ol class="reslist" id="resList"></ol>
   </section>
 </main>
 
 <script src="config.js?v=17"></script>
-<script src="shared.js?v=6"></script>
+<script src="shared.js?v=7"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const STORE_KEY = "delivery-quiz-gh-v1";
 
@@ -83,7 +100,7 @@ save();
 
 /* ---------- Views ---------- */
 function show(view){
-  for(const v of ["team","play","done","closed"]) $("view-"+v).hidden = v!==view;
+  for(const v of ["team","play","done","closed","results"]) $("view-"+v).hidden = v!==view;
   $("teamChip").hidden = !state.team || view==="team" || view==="closed";
   $("teamChip").textContent = state.team || "";
   $("teamChip").setAttribute("aria-label", state.team ? `${state.team}. Change team` : "");
@@ -159,7 +176,7 @@ $("submitBtn").onclick=async()=>{
   btn.disabled=true; btn.textContent="Submitting…"; setMsg(msg,"");
   try{
     await api({action:"submit", team:state.team, steps, clientId:state.clientId});
-    state.submitted=true; save(); renderDone(); show("done");
+    state.submitted=true; state.lastSubmit=steps; save(); renderDone(); show("done");
   }catch(err){
     if(err.code==="closed"){ show("closed"); }
     else if(err.code==="not_configured"){ setMsg(msg,"This quiz isn’t connected to its answer sheet yet. Ask the host to finish setup.",true); }
@@ -177,12 +194,53 @@ $("editBtn").onclick=()=>{ renderSteps(); show("play"); };
 
 // Clear this phone's answers: fresh shuffle, no days. Keeps the team and the person.
 function resetAnswers(note){
-  state.order=shuffle(PHASES.slice()); state.days={}; state.submitted=false; save();
+  state.order=shuffle(PHASES.slice()); state.days={}; state.submitted=false; delete state.lastSubmit; save();
   setMsg($("submitMsg"),"");
   setMsg($("roundNote"),note||"");
   if(state.team){ renderSteps(); show("play"); } else { renderTeams(); show("team"); }
 }
 $("againBtn").onclick=()=>resetAnswers();
+
+/* ---------- Results ---------- */
+function renderResults(k){
+  const steps=state.lastSubmit, sc=scoreSub({steps},k);
+  $("resLede").textContent=`Here’s how your answer for ${state.team} compares with the correct one.`;
+  $("resTotal").textContent=sc.total.toFixed(1);
+  $("resOrder").textContent=`Order ${Math.round(sc.orderPct)}%`;
+  const anyTimed=k.order.some(p=>Number.isInteger(k.days[p]));
+  $("resDays").textContent=anyTimed?`Days ${Math.round(sc.daysPct)}%`:"";
+  const ol=$("resList"); ol.innerHTML="";
+  steps.forEach((st,i)=>{
+    const r=stepResult(st,i,k); if(!r) return;
+    const li=document.createElement("li");
+    li.className="res "+(r.dist===0 && r.daysOk ? "all-ok" : "has-miss");
+    li.innerHTML=`<span class="n">${i+1}</span><div class="body"><div class="nm"></div><div class="lines"><span class="pos"></span><span class="dys"></span></div></div>`;
+    li.querySelector(".nm").textContent=label(st.phase);
+    const pos=li.querySelector(".pos"), dys=li.querySelector(".dys");
+    const span=r.b.lo!==r.b.hi;
+    if(r.dist===0){ pos.className="pos ok"; pos.textContent= span ? `✓ Position (any of ${posLabel(r.b)})` : "✓ Position"; }
+    else { pos.className="pos miss"; pos.textContent=`✗ Position: correct is ${posLabel(r.b)}${span?" (any order)":""}, ${r.dist} ${r.dist===1?"place":"places"} off`; }
+    if(!r.timed){ dys.className="dys tbd"; dys.textContent=`Days: ${st.days} (not scored)`; }
+    else if(r.daysOk){ dys.className="dys ok"; dys.textContent=`✓ ${r.c} ${r.c===1?"day":"days"}`; }
+    else { const diff=st.days-r.c; dys.className="dys miss"; dys.textContent=`✗ Days: you said ${st.days}, correct is ${r.c} (${diff>0?"+":"−"}${Math.abs(diff)})`; }
+    ol.appendChild(li);
+  });
+}
+function renderClosedKey(k){
+  const wrap=$("closedKeyWrap");
+  if(!k){ wrap.hidden=true; return; }
+  const ol=$("closedKey"); ol.innerHTML="";
+  k.order.forEach((p,i)=>{
+    const b=block(p,k), li=document.createElement("li");
+    li.innerHTML=`<span class="n"></span><span></span><span class="d"></span>`;
+    li.children[0].textContent=b.lo!==b.hi?posLabel(b).slice(1):i+1;
+    li.children[1].textContent=label(p)+(b.lo!==b.hi?" (any order)":"");
+    li.children[2].textContent=Number.isInteger(k.days[p])?`${k.days[p]} ${k.days[p]===1?"day":"days"}`:"TBD";
+    ol.appendChild(li);
+  });
+  $("closedLede").textContent="The host has closed this round. Here’s the correct answer.";
+  wrap.hidden=false;
+}
 
 /* ---------- Start ---------- */
 function route(){
@@ -205,7 +263,11 @@ async function checkStatus(){
         resetAnswers("A new round has started, so your previous answers were cleared.");
       }
     }
-    if(r.open===false){ wasClosed=true; show("closed"); }
+    if(r.open===false){
+      wasClosed=true;
+      if(r.key && state.lastSubmit){ renderResults(r.key); show("results"); }
+      else { renderClosedKey(r.key); show("closed"); }
+    }
     else if(wasClosed || !$("view-closed").hidden){ wasClosed=false; route(); }
   }catch(e){}
 }

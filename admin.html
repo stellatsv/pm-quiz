@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <div class="bar">
@@ -44,8 +44,9 @@
 
     <details class="card keypanel" id="keyPanel">
       <summary>Answer key and scoring</summary>
-      <p class="rules" style="margin-top:12px">Drag the steps into the correct order and enter each one’s days. Sequence: full credit in the right place, two-thirds one place off, one-third two places off. Days: credit falls in a straight line to zero at 100% off. Leave days blank for a TBD step; it then counts for order only.</p>
-      <ol class="steps" id="keyRows" style="margin-bottom:16px"></ol>
+      <p class="rules" style="margin-top:12px">Drag the steps into the correct order and enter each one’s days. Sequence: full credit in the right place, two-thirds one place off, one-third two places off. Days: credit falls in a straight line to zero at 100% off. Leave days blank for a TBD step; it then counts for order only. Mark neighbouring steps <strong>Any order</strong> to accept them in any arrangement within their positions.</p>
+      <ol class="steps" id="keyRows" style="margin-bottom:8px"></ol>
+      <p class="meta" id="groupNote" hidden style="margin:0 0 16px"></p>
       <label class="weight"><span>Balance: <output id="weightOut"></output></span><input type="range" id="weight" min="0" max="100" step="10" value="50"></label>
       <button class="primary" id="saveKey" type="button">Save answer key</button>
       <p class="msg" id="keyMsg" hidden></p>
@@ -57,9 +58,9 @@
 </main>
 
 <script src="config.js?v=17"></script>
-<script src="shared.js?v=6"></script>
+<script src="shared.js?v=7"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP, block, posLabel, stepResult, scoreSub } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const PW_KEY = "delivery-quiz-admin-pw";
 
@@ -154,22 +155,6 @@ $("roundBtn").onclick=async()=>{
 };
 
 /* ---------- Scoring ---------- */
-function scoreSub(s,k){
-  const steps=s.steps||[], n=k.order.length;
-  // Steps with days left blank (TBD) count for order only.
-  const timed=k.order.filter(p=>Number.isInteger(k.days[p])).length;
-  let o=0,d=0;
-  steps.forEach((st,gi)=>{
-    const ci=k.order.indexOf(st.phase); if(ci<0) return;
-    o+=Math.max(0,1-Math.abs(gi-ci)/3);
-    const c=k.days[st.phase], g=st.days;
-    if(!Number.isInteger(c)) return;
-    d+= c===0 ? (g===0?1:0) : Math.max(0,1-Math.abs(g-c)/c);
-  });
-  const orderPct=o/n*100, daysPct=timed ? d/timed*100 : 0;
-  const w = timed ? (k.orderWeight??50)/100 : 1;
-  return {orderPct,daysPct,total:w*orderPct+(1-w)*daysPct};
-}
 
 /* ---------- Answer key form ---------- */
 function renderKeyForm(){
@@ -178,16 +163,22 @@ function renderKeyForm(){
   // Start from the saved order; slot in any new steps where they sit in the list.
   let order = src ? src.order.filter(p=>PHASES.includes(p)) : PHASES.slice();
   PHASES.forEach((p,i)=>{ if(!order.includes(p)) order.splice(Math.min(i,order.length),0,p); });
+  const flexSet=new Set(((src&&src.groups)||[]).flat());
   order.forEach(p=>{
     const days = src && src.days && Number.isInteger(src.days[p]) ? src.days[p] : "";
     const li=document.createElement("li"); li.className="step"; li.dataset.phase=p;
-    li.innerHTML=`<button class="grip" type="button">${GRIP}</button><span class="num"></span><span class="name"></span><label class="days"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" placeholder="TBD"><span>days</span></label>`;
-    li.querySelector(".name").textContent=label(p);
+    li.innerHTML=`<button class="grip" type="button">${GRIP}</button><span class="num"></span><span class="name keyname"><span class="nm"></span><button class="flex" type="button" aria-pressed="false">Any order</button></span><label class="days"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" placeholder="TBD"><span>days</span></label>`;
+    li.querySelector(".nm").textContent=label(p);
+    const fx=li.querySelector(".flex");
+    fx.setAttribute("aria-label",`${label(p)} can be in any order with the neighbouring steps marked Any order`);
+    const setFlex=on=>{ fx.setAttribute("aria-pressed",String(on)); li.classList.toggle("flexed",on); };
+    setFlex(flexSet.has(p));
+    fx.addEventListener("click",()=>{ setFlex(fx.getAttribute("aria-pressed")!=="true"); keyDirty=true; describeGroups(); });
     const inp=li.querySelector("input"); inp.value=days; inp.setAttribute("aria-label",`Correct days for ${label(p)}`);
     inp.addEventListener("input",()=>{ inp.value=inp.value.replace(/\D/g,"").slice(0,3); keyDirty=true; });
     rows.appendChild(li);
   });
-  renumberKey();
+  renumberKey(); describeGroups();
   $("weight").value = src ? (src.orderWeight??50) : 50;
   updateWeight();
   keyDirty=false;
@@ -198,7 +189,28 @@ function renumberKey(){
     li.querySelector(".grip").setAttribute("aria-label",`Move ${label(li.dataset.phase)}, currently step ${i+1} of ${PHASES.length}. Use the up and down arrow keys.`);
   });
 }
-makeSortable($("keyRows"), ()=>{ keyDirty=true; renumberKey(); });
+makeSortable($("keyRows"), ()=>{ keyDirty=true; renumberKey(); describeGroups(); });
+
+// Neighbouring steps marked "Any order" form one block that can be arranged freely.
+function keyGroups(){
+  const groups=[]; let cur=[];
+  [...$("keyRows").children].forEach(li=>{
+    if(li.classList.contains("flexed")) cur.push(li.dataset.phase);
+    else { if(cur.length>1) groups.push(cur); cur=[]; }
+  });
+  if(cur.length>1) groups.push(cur);
+  return groups;
+}
+function describeGroups(){
+  const rows=[...$("keyRows").children], el=$("groupNote");
+  const parts=keyGroups().map(g=>{
+    const idx=g.map(p=>rows.findIndex(r=>r.dataset.phase===p));
+    return `${g.map(label).join(", ")} (positions ${Math.min(...idx)+1}–${Math.max(...idx)+1})`;
+  });
+  const lone=rows.filter((li,i)=>li.classList.contains("flexed") && !(rows[i-1]&&rows[i-1].classList.contains("flexed")) && !(rows[i+1]&&rows[i+1].classList.contains("flexed")));
+  el.hidden=!parts.length && !lone.length;
+  el.textContent=(parts.length?`Any order: ${parts.join("; ")}.`:"")+(lone.length?` ${lone.map(li=>label(li.dataset.phase)).join(", ")} ${lone.length===1?"needs a":"need"} marked neighbour to form a block.`:"");
+}
 function updateWeight(){ const w=+$("weight").value; $("weightOut").textContent=`sequence ${w}%, days ${100-w}%`; }
 $("weight").addEventListener("input",()=>{ updateWeight(); keyDirty=true; });
 
@@ -206,10 +218,10 @@ $("saveKey").onclick=async()=>{
   const msg=$("keyMsg"), rows=[...$("keyRows").children];
   const days={}, tbd=[];
   rows.forEach(r=>{ const v=r.querySelector("input").value; if(v==="") { tbd.push(label(r.dataset.phase)); days[r.dataset.phase]=null; } else days[r.dataset.phase]=parseInt(v,10); });
-  const order=rows.map(r=>r.dataset.phase);
+  const order=rows.map(r=>r.dataset.phase), groups=keyGroups();
   const btn=$("saveKey"); btn.disabled=true; btn.textContent="Saving…";
   try{
-    await api({action:"saveKey", password, key:{order,days,orderWeight:+$("weight").value}});
+    await api({action:"saveKey", password, key:{order,days,groups,orderWeight:+$("weight").value}});
     keyDirty=false; setMsg(msg, tbd.length ? `Answer key saved. Days are TBD for ${tbd.join(", ")}, so ${tbd.length===1?"that step counts":"those steps count"} for order only.` : "Answer key saved. Scores below are updated.");
     await refresh(true);
   }catch(e){
@@ -225,14 +237,15 @@ $("saveKey").onclick=async()=>{
 function scoredList(el,s,k){
   el.innerHTML=""; el.classList.add("scored");
   (s.steps||[]).forEach((st,i)=>{
-    const ci=k.order.indexOf(st.phase)+1, c=k.days[st.phase];
+    const r=stepResult(st,i,k); if(!r) return;
+    const c=r.c;
     const li=document.createElement("li");
     li.innerHTML=`<span class="n">${i+1}</span><span></span><span class="d"></span><span class="ans"></span>`;
     li.children[1].textContent=label(st.phase);
     li.children[2].textContent=`${st.days} d`;
     const a=li.children[3];
-    a.textContent=`answer: #${ci}, ${Number.isInteger(c)?c+" d":"TBD"}`;
-    if(ci===i+1 && (c===st.days || !Number.isInteger(c))) a.classList.add("ok");
+    a.textContent=`answer: ${posLabel(r.b)}, ${r.timed?c+" d":"TBD"}`;
+    if(r.dist===0 && r.daysOk) a.classList.add("ok");
     el.appendChild(li);
   });
 }

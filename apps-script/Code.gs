@@ -121,8 +121,22 @@ function saveKey_(key) {
     if (!Number.isInteger(d) || d < 0 || d > 999) return json({ ok: false, error: "bad_request" });
     days[p] = d;
   }
+  // Optional "any order" blocks: lists of phases that can be arranged freely among themselves.
+  const groups = [];
+  const grouped = {};
+  if (key.groups !== undefined) {
+    if (!Array.isArray(key.groups) || key.groups.length > 10) return json({ ok: false, error: "bad_request" });
+    for (const g of key.groups) {
+      if (!Array.isArray(g) || g.length < 2) return json({ ok: false, error: "bad_request" });
+      for (const p of g) {
+        if (!seen[p] || grouped[p]) return json({ ok: false, error: "bad_request" });
+        grouped[p] = true;
+      }
+      groups.push(g.slice());
+    }
+  }
   const w = Math.max(0, Math.min(100, Number(key.orderWeight)));
-  props_().setProperty("KEY", JSON.stringify({ order: key.order, days: days, orderWeight: isNaN(w) ? 50 : w, updatedAt: Date.now() }));
+  props_().setProperty("KEY", JSON.stringify({ order: key.order, days: days, groups: groups, orderWeight: isNaN(w) ? 50 : w, updatedAt: Date.now() }));
   return json({ ok: true });
 }
 
@@ -148,8 +162,15 @@ function checkPassword_(given) {
 }
 
 // What every participant's phone checks: is the quiz open, and which round is running.
+// Once submissions are closed, it also carries the answer key so phones can show results.
 function status_() {
-  return { ok: true, open: isOpen_(), round: Number(props_().getProperty("RESET_AT") || 0) };
+  const open = isOpen_();
+  const out = { ok: true, open: open, round: Number(props_().getProperty("RESET_AT") || 0) };
+  if (!open) {
+    const keyRaw = props_().getProperty("KEY");
+    if (keyRaw) out.key = JSON.parse(keyRaw);
+  }
+  return out;
 }
 
 function isOpen_() {
