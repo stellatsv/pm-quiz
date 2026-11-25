@@ -16,7 +16,7 @@ window.QUIZ_CONFIG = {
   // answer key on the admin page.
   PHASES: [
     "Engagement Checklist", "SD Creation", "Solution Analysis", "Project Plan", "Content Preparation",
-    "MNO Content Approval", "MNO Integration Details",
+    "MNO Content Approval", "MNO Integration Details", "Portal",
     "System Delivery (Curry, Dryad, Reporting, SecureD)", "Integration", "Configuration",
     "E2E Testing", "UAT", "Launch"
   ]
