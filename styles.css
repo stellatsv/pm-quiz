@@ -164,3 +164,13 @@ mark.hl{white-space:nowrap;background:var(--accent);color:var(--accent-ink);font
 .card{border-top:4px solid var(--accent)}
 .foot{background:color-mix(in srgb,var(--paper) 94%,transparent)}
 .total{font-family:var(--head);font-weight:400}
+
+/* Team members on the admin page */
+.members{margin-top:10px;display:grid;gap:6px}
+.member{border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.member summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;font-weight:700}
+.member summary::-webkit-details-marker{display:none}
+.member summary .who::before{content:"\25B8";display:inline-block;margin-right:8px;color:var(--accent-text);transition:transform .15s}
+.member[open] summary .who::before{transform:rotate(90deg)}
+.member .mscore{color:var(--accent-text);font-variant-numeric:tabular-nums}
+.member .summary{margin:8px 0 12px}

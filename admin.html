@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <div class="bar">
@@ -238,27 +238,50 @@ function scoredList(el,s,k){
 }
 
 function renderResults(){
-  const box=$("results"), board=$("board"); box.innerHTML=""; board.innerHTML="";
+  const box=$("results"), board=$("board");
+  // Remember which people were expanded so the auto-refresh doesn't collapse them
+  const wasOpen=new Set([...box.querySelectorAll("details.member[open]")].map(d=>d.dataset.id));
+  const firstRender=!box.querySelector("details.member");
+  box.innerHTML=""; board.innerHTML="";
   const subs=(data && data.submissions)||[];
+
+  // Group by team, then by person (one browser = one person); each person's latest answer counts.
   const byTeam={};
-  subs.forEach(s=>{ (byTeam[s.team]=byTeam[s.team]||[]).push(s); });
+  subs.forEach(s=>{
+    const t=(byTeam[s.team]=byTeam[s.team]||{});
+    const id=s.clientId||("anon-"+s.submittedAt);
+    (t[id]=t[id]||[]).push(s);
+  });
   const teams=TEAMS.filter(t=>byTeam[t]).concat(Object.keys(byTeam).filter(t=>!TEAMS.includes(t)));
-  $("resultsLede").textContent=`${teams.length} of ${TEAMS.length} teams have answered. Updates every 15 seconds.`;
+  const people=teams.reduce((n,t)=>n+Object.keys(byTeam[t]).length,0);
+  $("resultsLede").textContent=`${teams.length} of ${TEAMS.length} teams have answered (${people} ${people===1?"person":"people"}). Updates every 15 seconds.`;
   if(!teams.length){ box.innerHTML='<div class="empty-state">No answers yet this round. Share the quiz link with the teams to get started.</div>'; return; }
 
-  const latest=teams.map(t=>{
-    const list=byTeam[t].sort((a,b)=>b.submittedAt-a.submittedAt);
-    return {t,list,s:list[0],sc:key?scoreSub(list[0],key):null};
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const rows=teams.map(t=>{
+    // Number members in the order they first submitted
+    const members=Object.values(byTeam[t]).map(list=>{
+      list.sort((a,b)=>b.submittedAt-a.submittedAt);
+      return {s:list[0], first:list[list.length-1].submittedAt, count:list.length};
+    }).sort((a,b)=>a.first-b.first);
+    members.forEach((m,i)=>{ m.name=`${t} #${i+1}`; m.sc=key?scoreSub(m.s,key):null; });
+    const team={t,members,last:Math.max(...members.map(m=>m.s.submittedAt))};
+    if(key){
+      team.total=avg(members.map(m=>m.sc.total));
+      team.orderPct=avg(members.map(m=>m.sc.orderPct));
+      team.daysPct=avg(members.map(m=>m.sc.daysPct));
+    }
+    return team;
   });
 
   if(key){
-    latest.sort((a,b)=>b.sc.total-a.sc.total || a.s.submittedAt-b.s.submittedAt);
+    rows.sort((a,b)=>b.total-a.total || a.last-b.last);
     const wrap=document.createElement("div"); wrap.className="boardwrap";
     const tbl=document.createElement("table"); tbl.className="board";
-    tbl.innerHTML=`<thead><tr><th class="t">#</th><th class="t">Team</th><th>Score</th><th>Sequence</th><th>Days</th><th>Total days</th></tr></thead><tbody></tbody>`;
-    latest.forEach((x,i)=>{
+    tbl.innerHTML=`<thead><tr><th class="t">#</th><th class="t">Team</th><th>Avg score</th><th>Sequence</th><th>Days</th><th>People</th></tr></thead><tbody></tbody>`;
+    rows.forEach((x,i)=>{
       const tr=document.createElement("tr"); if(i===0) tr.className="first";
-      tr.innerHTML=`<td class="rank">${i+1}</td><td class="t"></td><td class="score">${x.sc.total.toFixed(1)}</td><td>${Math.round(x.sc.orderPct)}%</td><td>${Math.round(x.sc.daysPct)}%</td><td>${x.s.total}</td>`;
+      tr.innerHTML=`<td class="rank">${i+1}</td><td class="t"></td><td class="score">${x.total.toFixed(1)}</td><td>${Math.round(x.orderPct)}%</td><td>${Math.round(x.daysPct)}%</td><td>${x.members.length}</td>`;
       tr.children[1].textContent=x.t;
       tbl.tBodies[0].appendChild(tr);
     });
@@ -267,15 +290,28 @@ function renderResults(){
     board.innerHTML='<div class="empty-state" style="margin-top:20px">Add the answer key above to score and rank the teams.</div>';
   }
 
-  latest.forEach(({t,list,s,sc})=>{
+  rows.forEach(team=>{
     const card=document.createElement("article"); card.className="card";
-    card.innerHTML=`<header><h3></h3><span class="meta"></span></header><p class="meta" style="margin:4px 0 0"></p><ol class="summary"></ol>`;
-    card.querySelector("h3").textContent=t;
+    card.innerHTML=`<header><h3></h3><span class="meta"></span></header><p class="meta" style="margin:4px 0 0"></p><div class="members"></div>`;
+    card.querySelector("h3").textContent=team.t;
     const hm=card.querySelector("header .meta");
-    if(sc){ hm.className="score-pill"; hm.textContent=`${sc.total.toFixed(1)} points`; } else hm.textContent=`${s.total} days in total`;
-    const when=new Date(s.submittedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-    card.querySelector("p.meta").textContent=`Submitted at ${when}`+(list.length>1?`. Showing the latest of ${list.length} answers from this team.`:"");
-    if(key) scoredList(card.querySelector("ol"),s,key); else summaryList(card.querySelector("ol"),s.steps||[]);
+    if(key){ hm.className="score-pill"; hm.textContent=`${team.total.toFixed(1)} points average`; }
+    else hm.textContent=`${team.members.length} ${team.members.length===1?"person":"people"}`;
+    card.querySelector("p.meta").textContent = key && team.members.length>1
+      ? `Average of ${team.members.length} people. Open a person to see their answer.`
+      : (team.members.length>1 ? "Open a person to see their answer." : "");
+    const box2=card.querySelector(".members");
+    team.members.forEach(m=>{
+      const d=document.createElement("details"); d.className="member"; d.dataset.id=m.name;
+      d.open = wasOpen.has(m.name) || (firstRender && team.members.length===1);
+      const when=new Date(m.s.submittedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+      d.innerHTML=`<summary><span class="who"></span><span class="mscore"></span></summary><p class="meta" style="margin:6px 0 0"></p><ol class="summary"></ol>`;
+      d.querySelector(".who").textContent=m.name;
+      d.querySelector(".mscore").textContent = m.sc ? `${m.sc.total.toFixed(1)} points` : "";
+      d.querySelector("p.meta").textContent=`Submitted at ${when}`+(m.count>1?`. Latest of ${m.count} answers from this person.`:"");
+      if(key) scoredList(d.querySelector("ol"),m.s,key); else summaryList(d.querySelector("ol"),m.s.steps||[]);
+      box2.appendChild(d);
+    });
     box.appendChild(card);
   });
 }
