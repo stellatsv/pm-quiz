@@ -9,7 +9,7 @@ window.QUIZ_CONFIG = {
 
   // How a phase is shown on screen, if different from its name below.
   // Renaming here needs no change to the Apps Script.
-  PHASE_LABELS: { "Launch": "Launch Actions", "SD Creation": "Service Description Process", "MNO Integration Details": "MNO Integration Details Provision", "E2E Testing": "Upstream E2E Testing", "UAT": "Customer UAT", "Integration": "External/Internal Integration", "Configuration": "Configuration of Internal Systems (e.g. Dryad, Curry, Icarus etc.)" },
+  PHASE_LABELS: { "Launch": "Launch Actions", "SD Creation": "Service Description Process", "MNO Integration Details": "MNO Integration Details Provision", "E2E Testing": "Upstream E2E Testing", "UAT": "Customer UAT", "Integration": "External/Internal Integration", "Configuration": "Configuration of Internal Systems (e.g. Dryad, Curry, Icarus etc.)", "Portal": "Portal Development" },
 
   // The phases participants put in order. The Apps Script accepts whatever is listed here,
   // so you can add or remove phases without redeploying it. After a change, re-save the
