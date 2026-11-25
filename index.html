@@ -59,9 +59,9 @@
 </main>
 
 <script src="config.js?v=16"></script>
-<script src="shared.js?v=5"></script>
+<script src="shared.js?v=6"></script>
 <script>
-const { cfg, api, $, setMsg, summaryList, label } = window.Quiz;
+const { cfg, api, $, setMsg, summaryList, label, makeSortable, GRIP } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const STORE_KEY = "delivery-quiz-gh-v1";
 
@@ -104,7 +104,6 @@ function renderTeams(){
 $("startBtn").onclick=()=>{ renderSteps(); show("play"); };
 
 /* ---------- Steps list ---------- */
-const GRIP='<svg viewBox="0 0 14 20" fill="currentColor"><circle cx="3" cy="3" r="2"/><circle cx="11" cy="3" r="2"/><circle cx="3" cy="10" r="2"/><circle cx="11" cy="10" r="2"/><circle cx="3" cy="17" r="2"/><circle cx="11" cy="17" r="2"/></svg>';
 
 function renderSteps(){
   const ol=$("steps"); ol.innerHTML="";
@@ -120,12 +119,6 @@ function renderSteps(){
       if(input.value==="") delete state.days[phase]; else state.days[phase]=parseInt(input.value,10);
       save(); updateFooter();
     });
-    const grip=li.querySelector(".grip");
-    grip.addEventListener("pointerdown",e=>startDrag(e,li,grip));
-    grip.addEventListener("keydown",e=>{
-      if(e.key==="ArrowUp" && li.previousElementSibling){ e.preventDefault(); ol.insertBefore(li,li.previousElementSibling); syncOrder(); grip.focus(); }
-      if(e.key==="ArrowDown" && li.nextElementSibling){ e.preventDefault(); ol.insertBefore(li.nextElementSibling,li); syncOrder(); grip.focus(); }
-    });
     ol.appendChild(li);
   });
   renumber(); updateFooter();
@@ -136,143 +129,8 @@ function renumber(){
     li.querySelector(".grip").setAttribute("aria-label",`Move ${label(li.dataset.phase)}, currently step ${i+1} of ${PHASES.length}. Use the up and down arrow keys.`);
   });
 }
+makeSortable($("steps"), ()=>syncOrder());
 function syncOrder(){ state.order=[...$("steps").children].map(li=>li.dataset.phase); save(); renumber(); updateFooter(); }
-
-/* Pointer drag: mouse, touch and pen.
-   The held step is lifted out of the list (position:fixed) and follows the pointer exactly;
-   a placeholder holds its slot, and the other steps slide out of the way. */
-let drag=null;
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-function startDrag(e,li,grip){
-  if(drag || (e.button!==undefined && e.button!==0)) return;
-  e.preventDefault();
-  try{ grip.setPointerCapture(e.pointerId); }catch(err){}
-  const ol=$("steps"), r=li.getBoundingClientRect();
-  const ph=document.createElement("li");
-  ph.className="step-placeholder"; ph.style.height=r.height+"px";
-  ol.insertBefore(ph,li);
-  Object.assign(li.style,{position:"fixed",left:r.left+"px",top:r.top+"px",width:r.width+"px",margin:"0"});
-  li.classList.add("dragging");
-  document.body.classList.add("is-dragging");
-  drag={li,grip,ph,ol,id:e.pointerId,offsetY:e.clientY-r.top,top:r.top,pointerY:e.clientY,raf:0,lastIndex:-1};
-  grip.addEventListener("pointermove",onDrag);
-  grip.addEventListener("pointerup",endDrag);
-  grip.addEventListener("pointercancel",endDrag);
-  grip.addEventListener("lostpointercapture",endDrag);
-  drag.raf=requestAnimationFrame(tick);
-}
-
-function onDrag(e){
-  if(!drag || e.pointerId!==drag.id) return;
-  e.preventDefault();
-  drag.pointerY=e.clientY;
-}
-
-// Runs every frame while dragging: position the card, auto-scroll, reorder.
-function tick(){
-  if(!drag) return;
-  update(true);
-  drag.raf=requestAnimationFrame(tick);
-}
-function update(scroll){
-  const {li,ph,ol}=drag;
-  // Keep the card inside the list area
-  const listR=ol.getBoundingClientRect(), h=li.offsetHeight;
-  let top=drag.pointerY-drag.offsetY;
-  top=Math.max(listR.top-h/2, Math.min(listR.bottom-h/2, top));
-  drag.top=top;
-  li.style.top=top+"px";
-
-  // Auto-scroll when the pointer is near the top, or near the sticky footer
-  const foot=document.querySelector(".foot");
-  const bottomEdge=foot ? foot.getBoundingClientRect().top : window.innerHeight;
-  const zone=80, y=drag.pointerY;
-  let speed=0;
-  if(y<zone) speed=-Math.ceil((zone-y)/zone*14);
-  else if(y>bottomEdge-zone) speed=Math.ceil((y-(bottomEdge-zone))/zone*14);
-  if(speed && scroll) window.scrollBy(0,speed);
-
-  // Find the slot under the card's centre
-  const others=[...ol.children].filter(n=>n!==li && n!==ph);
-  // Use layout positions (offsetTop), not animated ones, so sliding steps don't cause flicker
-  // Swap at half overlap: moving up, the card's top edge passes a step's midpoint;
-  // moving down, its bottom edge does.
-  const base=ph.getBoundingClientRect().top-ph.offsetTop;
-  const midOf=n=>base+n.offsetTop+n.offsetHeight/2;
-  let target;
-  if(top < base+ph.offsetTop){
-    target=others.find(n=>top < midOf(n)) || null;
-  } else {
-    const bottom=top+h;
-    let last=-1; others.forEach((n,i)=>{ if(bottom > midOf(n)) last=i; });
-    target=others[last+1] || null;
-  }
-  let next=ph.nextElementSibling; if(next===li) next=li.nextElementSibling;
-  if(next!==target) moveWithAnimation(()=>ol.insertBefore(ph,target), others);
-}
-
-// FLIP: measure, move, then animate each sibling from its old spot to the new one.
-function moveWithAnimation(mutate, nodes){
-  const before=new Map(nodes.map(n=>[n,n.getBoundingClientRect().top]));
-  mutate();
-  if(reduceMotion) { renumberLive(); return; }
-  nodes.forEach(n=>{
-    const dy=before.get(n)-n.getBoundingClientRect().top;
-    if(!dy) return;
-    n.style.transition="none";
-    n.style.transform=`translateY(${dy}px)`;
-    n.getBoundingClientRect();
-    n.style.transition="transform .18s cubic-bezier(.2,.7,.3,1)";
-    n.style.transform="";
-  });
-  renumberLive();
-  if(navigator.vibrate) { try{ navigator.vibrate(4); }catch(e){} }
-}
-
-// Show the numbers the steps would have if dropped now.
-function renumberLive(){
-  if(!drag) return;
-  let i=0;
-  [...drag.ol.children].forEach(n=>{
-    if(n===drag.li) return;
-    const target = n===drag.ph ? drag.li : n;
-    target.querySelector(".num").textContent=++i;
-  });
-}
-
-function endDrag(e){
-  if(!drag || (e && e.pointerId!==undefined && e.pointerId!==drag.id)) return;
-  const {li,grip,ph,ol}=drag;
-  cancelAnimationFrame(drag.raf);
-  if(e && e.type==="pointerup" && e.clientY!==undefined){ drag.pointerY=e.clientY; }
-  update(false); // settle on the slot under the final pointer position
-  grip.removeEventListener("pointermove",onDrag);
-  grip.removeEventListener("pointerup",endDrag);
-  grip.removeEventListener("pointercancel",endDrag);
-  grip.removeEventListener("lostpointercapture",endDrag);
-  try{ grip.releasePointerCapture(drag.id); }catch(err){}
-  drag=null;
-
-  const finish=()=>{
-    ol.insertBefore(li,ph); ph.remove();
-    li.classList.remove("dragging","dropping");
-    Object.assign(li.style,{position:"",left:"",top:"",width:"",margin:"",transition:"",transform:""});
-    [...ol.children].forEach(n=>{ n.style.transition=""; n.style.transform=""; });
-    document.body.classList.remove("is-dragging");
-    syncOrder();
-  };
-  if(reduceMotion){ finish(); return; }
-  // Glide the card into its slot, then drop it in
-  const target=ph.getBoundingClientRect().top;
-  li.classList.add("dropping");
-  li.style.transition="top .16s cubic-bezier(.2,.7,.3,1)";
-  li.style.top=target+"px";
-  let done=false;
-  const once=()=>{ if(done) return; done=true; finish(); };
-  li.addEventListener("transitionend",once,{once:true});
-  setTimeout(once,220);
-}
 
 /* ---------- Footer ---------- */
 function updateFooter(){
