@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="bar">
@@ -71,8 +71,9 @@
       <div><span class="big" id="resTotal">0</span><span class="unit">points out of 100</span></div>
       <div class="splits"><span id="resOrder"></span><span id="resDays"></span></div>
     </div>
-    <p class="legend"><span class="okmark">✓</span> right &nbsp; <span class="xmark">✗</span> off, with the correct answer</p>
-    <ol class="reslist" id="resList"></ol>
+    <h2>The correct sequence</h2>
+    <p class="legend"><span class="swatch"></span>Highlighted: what you got wrong</p>
+    <ol class="cklist" id="resList"></ol>
   </section>
 </main>
 
@@ -204,25 +205,27 @@ $("againBtn").onclick=()=>resetAnswers();
 /* ---------- Results ---------- */
 function renderResults(k){
   const steps=state.lastSubmit, sc=scoreSub({steps},k);
-  $("resLede").textContent=`Here’s how your answer for ${state.team} compares with the correct one.`;
+  $("resLede").textContent=`How ${state.team}’s answer compares with the correct sequence.`;
   $("resTotal").textContent=sc.total.toFixed(1);
   $("resOrder").textContent=`Order ${Math.round(sc.orderPct)}%`;
   const anyTimed=k.order.some(p=>Number.isInteger(k.days[p]));
   $("resDays").textContent=anyTimed?`Days ${Math.round(sc.daysPct)}%`:"";
   const ol=$("resList"); ol.innerHTML="";
-  steps.forEach((st,i)=>{
-    const r=stepResult(st,i,k); if(!r) return;
+  // One row per step, in the correct order; mistakes are highlighted with what was entered.
+  k.order.forEach((p,i)=>{
+    const gi=steps.findIndex(x=>x.phase===p);
+    const mine=gi>=0?steps[gi]:null;
+    const r=mine?stepResult(mine,gi,k):null;
+    const b=block(p,k), span=b.lo!==b.hi;
+    const posWrong=!r || r.dist>0, daysWrong=!!r && r.timed && !r.daysOk;
     const li=document.createElement("li");
-    li.className="res "+(r.dist===0 && r.daysOk ? "all-ok" : "has-miss");
-    li.innerHTML=`<span class="n">${i+1}</span><div class="body"><div class="nm"></div><div class="lines"><span class="pos"></span><span class="dys"></span></div></div>`;
-    li.querySelector(".nm").textContent=label(st.phase);
-    const pos=li.querySelector(".pos"), dys=li.querySelector(".dys");
-    const span=r.b.lo!==r.b.hi;
-    if(r.dist===0){ pos.className="pos ok"; pos.textContent= span ? `✓ Position (any of ${posLabel(r.b)})` : "✓ Position"; }
-    else { pos.className="pos miss"; pos.textContent=`✗ Position: correct is ${posLabel(r.b)}${span?" (any order)":""}, ${r.dist} ${r.dist===1?"place":"places"} off`; }
-    if(!r.timed){ dys.className="dys tbd"; dys.textContent=`Days: ${st.days} (not scored)`; }
-    else if(r.daysOk){ dys.className="dys ok"; dys.textContent=`✓ ${r.c} ${r.c===1?"day":"days"}`; }
-    else { const diff=st.days-r.c; dys.className="dys miss"; dys.textContent=`✗ Days: you said ${st.days}, correct is ${r.c} (${diff>0?"+":"−"}${Math.abs(diff)})`; }
+    li.className="ck"+(posWrong?" pos-wrong":"")+(daysWrong?" days-wrong":"");
+    li.innerHTML=`<span class="n"></span><div class="body"><span class="nm"></span><span class="note"></span></div><div class="dcol"><span class="cd"></span><span class="yd"></span></div>`;
+    li.querySelector(".n").textContent = span ? `${b.lo+1}–${b.hi+1}` : i+1;
+    li.querySelector(".nm").textContent = label(p) + (span ? " (any order)" : "");
+    li.querySelector(".cd").textContent = Number.isInteger(k.days[p]) ? `${k.days[p]} d` : "TBD";
+    if(posWrong) li.querySelector(".note").textContent = mine ? `You placed it #${gi+1}` : "Not in your answer";
+    if(daysWrong) li.querySelector(".yd").textContent = `you: ${mine.days}`;
     ol.appendChild(li);
   });
 }

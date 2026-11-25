@@ -198,3 +198,20 @@ mark.hl{white-space:nowrap;background:var(--accent);color:var(--accent-ink);font
 .flex{font:600 .75rem/1 var(--body);padding:5px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
 .flex[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .step.flexed{background:var(--cream)}
+
+/* Participant results: correct sequence with mistakes highlighted */
+.legend{display:flex;align-items:center;gap:8px}
+.swatch{width:14px;height:14px;border-radius:3px;background:color-mix(in srgb,var(--danger) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--danger) 45%,transparent)}
+.cklist{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.ck{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px 10px 10px 6px;border-bottom:1px solid var(--line)}
+.ck .n{font:700 .9375rem var(--head);color:var(--accent-text);font-variant-numeric:tabular-nums;text-align:right}
+.ck .body{display:flex;flex-direction:column;min-width:0}
+.ck .nm{font-weight:600;line-height:1.25}
+.ck .note{font-size:.8125rem;font-weight:700;color:var(--danger)}
+.ck .note:empty{display:none}
+.ck .dcol{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ck .cd{font-weight:600;color:var(--body-ink)}
+.ck .yd{font-size:.8125rem;font-weight:700;color:var(--danger)}
+.ck .yd:empty{display:none}
+.ck.pos-wrong{background:color-mix(in srgb,var(--danger) 10%,var(--surface));box-shadow:inset 4px 0 0 var(--danger)}
+.ck.days-wrong:not(.pos-wrong) .dcol{background:color-mix(in srgb,var(--danger) 10%,var(--surface));border-radius:6px;padding:2px 8px;margin:-2px -4px}
