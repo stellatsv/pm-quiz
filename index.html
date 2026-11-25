@@ -176,7 +176,7 @@ $("submitBtn").onclick=async()=>{
   btn.disabled=true; btn.textContent="Submitting…"; setMsg(msg,"");
   try{
     await api({action:"submit", team:state.team, steps, clientId:state.clientId});
-    state.submitted=true; state.lastSubmit=steps; save(); renderDone(); show("done");
+    state.submitted=true; state.lastSubmit=steps; state.submittedAt=Date.now(); save(); renderDone(); show("done");
   }catch(err){
     if(err.code==="closed"){ show("closed"); }
     else if(err.code==="not_configured"){ setMsg(msg,"This quiz isn’t connected to its answer sheet yet. Ask the host to finish setup.",true); }
@@ -194,7 +194,7 @@ $("editBtn").onclick=()=>{ renderSteps(); show("play"); };
 
 // Clear this phone's answers: fresh shuffle, no days. Keeps the team and the person.
 function resetAnswers(note){
-  state.order=shuffle(PHASES.slice()); state.days={}; state.submitted=false; delete state.lastSubmit; save();
+  state.order=shuffle(PHASES.slice()); state.days={}; state.submitted=false; delete state.lastSubmit; delete state.submittedAt; save();
   setMsg($("submitMsg"),"");
   setMsg($("roundNote"),note||"");
   if(state.team){ renderSteps(); show("play"); } else { renderTeams(); show("team"); }
@@ -257,11 +257,15 @@ async function checkStatus(){
   try{
     const r=await api({action:"status"});
     if(typeof r.round==="number"){
-      if(state.round===undefined){ state.round=r.round; save(); }
-      else if(r.round!==state.round){
-        state.round=r.round; save();
-        resetAnswers("A new round has started, so your previous answers were cleared.");
-      }
+      // Answers are stale if the round changed since this phone last checked, or if they
+      // were submitted before the current round started (covers phones that never saw a round id).
+      const hasAnswers = state.submitted || Object.keys(state.days||{}).length>0;
+      const stale = hasAnswers && (
+        (state.round!==undefined && r.round!==state.round) ||
+        (state.round===undefined && state.submitted && (!state.submittedAt || state.submittedAt < r.round))
+      );
+      if(state.round!==r.round){ state.round=r.round; save(); }
+      if(stale) resetAnswers("A new round has started, so your previous answers were cleared.");
     }
     if(r.open===false){
       wasClosed=true;
