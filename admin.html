@@ -7,19 +7,20 @@
 <title>Quiz Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <div class="bar">
-  <span class="brand">Delivery Quiz · Admin</span>
+  <span class="brand"><img class="logo-color" src="assets/logo-color.png" alt="Upstream"><img class="logo-dark" src="assets/logo-dark.png" alt="Upstream">Quiz Admin</span>
   <button class="linkbtn" id="signOut" type="button" hidden>Sign out</button>
 </div>
 
 <main>
   <!-- Login -->
   <section id="view-login">
-    <h1>Host sign-in</h1>
+    <span class="tag">Dev Summit 2026 · Admin</span>
+    <h1>Host <mark class="hl">sign-in</mark></h1>
     <p class="lede">Enter the admin password to see answers, set the answer key and run rounds.</p>
     <form class="login" id="loginForm">
       <label for="pw" class="keyhead">Password</label>

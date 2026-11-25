@@ -6,19 +6,20 @@
 <title>Project Delivery Quiz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <div class="bar">
-  <span class="brand">Delivery Quiz</span>
+  <span class="brand"><img class="logo-color" src="assets/logo-color.png" alt="Upstream"><img class="logo-dark" src="assets/logo-dark.png" alt="Upstream">Delivery Quiz</span>
   <button class="chip" id="teamChip" type="button" hidden></button>
 </div>
 
 <main>
   <!-- 1. Team -->
   <section id="view-team">
-    <h1>Put the launch in order</h1>
+    <span class="tag">Dev Summit 2026 · Quiz time</span>
+    <h1>Put the launch <mark class="hl">in order</mark></h1>
     <p class="lede">Choose your team, then drag the eleven steps of a project delivery into the order they happen and estimate how many days each one takes.</p>
     <h2>Which team are you on?</h2>
     <ul class="teams" id="teamList"></ul>
@@ -43,7 +44,8 @@
 
   <!-- 3. Done -->
   <section id="view-done" hidden>
-    <h1>Answer submitted</h1>
+    <span class="tag">Dev Summit 2026</span>
+    <h1>Answer <mark class="hl">submitted</mark></h1>
     <p class="lede" id="doneLede"></p>
     <ol class="summary" id="doneSummary"></ol>
     <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button></div>
@@ -51,7 +53,8 @@
 
   <!-- 4. Closed -->
   <section id="view-closed" hidden>
-    <h1>Submissions are closed</h1>
+    <span class="tag">Dev Summit 2026</span>
+    <h1>Submissions are <mark class="hl">closed</mark></h1>
     <p class="lede">The host has closed this round. Hang tight for the results.</p>
   </section>
 </main>
