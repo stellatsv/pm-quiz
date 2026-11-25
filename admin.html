@@ -147,9 +147,15 @@ $("toggleOpen").onclick=async()=>{
 };
 $("roundBtn").onclick=async()=>{
   const b=$("roundBtn");
-  if(!roundArmed){ roundArmed=true; b.textContent="Select again to clear the board"; setTimeout(()=>{ roundArmed=false; b.textContent="Start a new round"; },4000); return; }
+  if(!roundArmed){ roundArmed=true; b.textContent="Select again to clear the board and reopen"; setTimeout(()=>{ roundArmed=false; b.textContent="Start a new round"; },4000); return; }
   roundArmed=false; b.textContent="Start a new round"; b.disabled=true;
-  try{ await api({action:"newRound", password}); await refresh(true); }
+  try{
+    await api({action:"newRound", password});
+    // A new round always starts open, so teams can play straight away.
+    if(data && data.open===false) await api({action:"setOpen", password, open:true});
+    await refresh(true);
+    setMsg($("resultsMsg"),"New round started. The board is clear and submissions are open.");
+  }
   catch(e){ setMsg($("resultsMsg"),"The new round didn’t start. Try again.",true); }
   finally{ b.disabled=false; }
 };

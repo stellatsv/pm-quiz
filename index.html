@@ -251,7 +251,7 @@ function renderLeaderboard(subs,k){
 }
 function renderClosedKey(k){
   const wrap=$("closedKeyWrap");
-  if(!k){ wrap.hidden=true; return; }
+  if(!k){ wrap.hidden=true; $("closedLede").textContent="The host has closed this round. Hang tight for the results."; return; }
   const ol=$("closedKey"); ol.innerHTML="";
   k.order.forEach((p,i)=>{
     const b=block(p,k), li=document.createElement("li");
@@ -293,7 +293,8 @@ async function checkStatus(){
     if(r.open===false){
       wasClosed=true;
       if(r.key && state.lastSubmit){ renderResults(r.key); renderLeaderboard(r.submissions,r.key); show("results"); }
-      else { renderClosedKey(r.key); show("closed"); }
+      // Only reveal the correct order if this round actually had answers.
+      else { renderClosedKey(Array.isArray(r.submissions) && r.submissions.length ? r.key : null); show("closed"); }
     }
     else if(wasClosed || !$("view-closed").hidden){ wasClosed=false; route(); }
   }catch(e){}

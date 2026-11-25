@@ -35,7 +35,7 @@ No sign-in is needed to take the quiz. The admin password is checked by Google A
 1. Open the admin page, sign in, and fill in **Answer key and scoring** (positions, days, and the sequence/days balance). Save.
 2. Share the quiz link with the teams. Answers appear on the admin page within 15 seconds.
 3. Select **Close submissions** when time is up. Within about 20 seconds, everyone who submitted sees their personal results: their score and, for each step, whether they had the right position and days, with the correct answer. Anyone who didn't submit sees the correct order.
-4. To run it again, select **Start a new round** (clears the board) and **Reopen submissions**.
+4. To run it again, select **Start a new round**. It clears the board, resets everyone's phone and reopens submissions in one go.
 
 Every answer is also kept as a row in the **Submissions** tab of your Google Sheet, including earlier rounds.
 
