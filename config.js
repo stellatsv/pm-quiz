@@ -11,9 +11,11 @@ window.QUIZ_CONFIG = {
   // Renaming here needs no change to the Apps Script.
   PHASE_LABELS: { "Launch": "Launch Actions", "SD Creation": "Service Description Process", "MNO Integration Details": "MNO Integration Details Provision", "E2E Testing": "Upstream E2E Testing", "UAT": "Customer UAT", "Integration": "External/Internal Integration", "Configuration": "Configuration of Internal Systems (e.g. Dryad, Curry, Icarus etc.)" },
 
-  // The phases participants put in order. If you change these, change PHASES in Code.gs too.
+  // The phases participants put in order. The Apps Script accepts whatever is listed here,
+  // so you can add or remove phases without redeploying it. After a change, re-save the
+  // answer key on the admin page.
   PHASES: [
-    "Engagement Checklist", "SD Creation", "Project Plan", "Content Preparation",
+    "Engagement Checklist", "SD Creation", "Solution Analysis", "Project Plan", "Content Preparation",
     "MNO Content Approval", "MNO Integration Details", "Integration", "Configuration",
     "E2E Testing", "UAT", "Launch"
   ]

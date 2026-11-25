@@ -9,16 +9,14 @@
  * The admin password lives only in Script properties, never in the website code.
  */
 
-// Must match PHASES in config.js.
-const PHASES = [
-  "Engagement Checklist", "SD Creation", "Project Plan", "Content Preparation",
-  "MNO Content Approval", "MNO Integration Details", "Integration", "Configuration",
-  "E2E Testing", "UAT", "Launch"
-];
+// The list of phases lives in config.js on the website. This script accepts any list
+// of up to MAX_PHASES distinct phase names, so adding or removing a phase there needs
+// no change or redeploy here.
+const MAX_PHASES = 30;
 
 const SHEET_NAME = "Submissions";
 const HEADER = ["Submitted at", "Team", "Total days", "Browser ID", "Answer (JSON)"]
-  .concat(PHASES.map((_, i) => "Step " + (i + 1)));
+  .concat(Array.from({ length: MAX_PHASES }, (_, i) => "Step " + (i + 1)));
 
 function doGet() {
   return json({ ok: true, open: isOpen_() });
@@ -59,12 +57,12 @@ function submit_(req) {
   const team = String(req.team || "").trim().slice(0, 60);
   const clientId = String(req.clientId || "").slice(0, 64);
   const steps = req.steps;
-  if (!team || !Array.isArray(steps) || steps.length !== PHASES.length) {
+  if (!team || !Array.isArray(steps) || steps.length < 1 || steps.length > MAX_PHASES) {
     return json({ ok: false, error: "bad_request" });
   }
   const seen = {};
   for (const s of steps) {
-    if (!s || PHASES.indexOf(s.phase) < 0 || seen[s.phase]) return json({ ok: false, error: "bad_request" });
+    if (!s || !validPhase_(s.phase) || seen[s.phase]) return json({ ok: false, error: "bad_request" });
     if (!Number.isInteger(s.days) || s.days < 0 || s.days > 999) return json({ ok: false, error: "bad_request" });
     seen[s.phase] = true;
   }
@@ -109,14 +107,14 @@ function results_() {
 }
 
 function saveKey_(key) {
-  if (!key || !Array.isArray(key.order) || key.order.length !== PHASES.length) return json({ ok: false, error: "bad_request" });
+  if (!key || !Array.isArray(key.order) || key.order.length < 1 || key.order.length > MAX_PHASES) return json({ ok: false, error: "bad_request" });
   const seen = {};
   for (const p of key.order) {
-    if (PHASES.indexOf(p) < 0 || seen[p]) return json({ ok: false, error: "bad_request" });
+    if (!validPhase_(p) || seen[p]) return json({ ok: false, error: "bad_request" });
     seen[p] = true;
   }
   const days = {};
-  for (const p of PHASES) {
+  for (const p of key.order) {
     const d = key.days && key.days[p];
     if (!Number.isInteger(d) || d < 0 || d > 999) return json({ ok: false, error: "bad_request" });
     days[p] = d;
@@ -127,6 +125,10 @@ function saveKey_(key) {
 }
 
 /* ---------- Helpers ---------- */
+
+function validPhase_(p) {
+  return typeof p === "string" && p.trim().length > 0 && p.length <= 100;
+}
 
 function checkPassword_(given) {
   const real = props_().getProperty("ADMIN_PASSWORD");

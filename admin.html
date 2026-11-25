@@ -57,14 +57,14 @@
   </section>
 </main>
 
-<script src="config.js?v=13"></script>
+<script src="config.js?v=14"></script>
 <script src="shared.js?v=5"></script>
 <script>
 const { cfg, api, $, setMsg, summaryList, label } = window.Quiz;
 const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
 const PW_KEY = "delivery-quiz-admin-pw";
 
-let password = null, data = null, key = null, keyDirty = false, timer = null, roundArmed = false;
+let password = null, data = null, key = null, savedKey = null, keyStale = false, keyDirty = false, timer = null, roundArmed = false;
 try{ password = sessionStorage.getItem(PW_KEY); }catch(e){}
 
 function show(view){
@@ -119,9 +119,17 @@ async function refresh(quiet){
 $("refreshBtn").onclick=()=>refresh(false);
 
 function applyData(){
-  key = data.key || null;
+  const saved = data.key || null;
+  // A key saved before steps were added or removed can't score fairly: ask for a re-save.
+  keyStale = !!saved && (saved.order.length!==PHASES.length || PHASES.some(p=>!saved.order.includes(p)));
+  savedKey = saved;
+  key = keyStale ? null : saved;
   if(!keyDirty) renderKeyForm();
   if(!key) $("keyPanel").open = true;
+  if(keyStale && !keyDirty){
+    const added=PHASES.filter(p=>!saved.order.includes(p)).map(label);
+    setMsg($("keyMsg"), `The steps changed since this key was saved${added.length?` (new: ${added.join(", ")})`:""}. Check the positions, fill in any missing days, then save to score the teams.`, true);
+  }
   const open = data.open !== false;
   $("statusLabel").textContent = open ? "Submissions open" : "Submissions closed";
   $("statusLabel").classList.toggle("closed", !open);
@@ -163,9 +171,13 @@ function scoreSub(s,k){
 /* ---------- Answer key form ---------- */
 function renderKeyForm(){
   const rows=$("keyRows"); rows.innerHTML="";
+  const src = key || savedKey;
+  // Start from the saved order; slot in any new steps where they sit in the list.
+  let order = src ? src.order.filter(p=>PHASES.includes(p)) : PHASES.slice();
+  PHASES.forEach((p,i)=>{ if(!order.includes(p)) order.splice(Math.min(i,order.length),0,p); });
   PHASES.forEach((p,i)=>{
-    const pos = key && key.order.includes(p) ? key.order.indexOf(p)+1 : i+1;
-    const days = key && Number.isInteger(key.days[p]) ? key.days[p] : "";
+    const pos = order.indexOf(p)+1;
+    const days = src && src.days && Number.isInteger(src.days[p]) ? src.days[p] : "";
     const row=document.createElement("div"); row.className="keyrow"; row.dataset.phase=p;
     row.innerHTML=`<span class="name"></span><select></select><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3">`;
     row.querySelector(".name").textContent=label(p);
@@ -177,7 +189,7 @@ function renderKeyForm(){
     sel.addEventListener("change",()=>{ keyDirty=true; });
     rows.appendChild(row);
   });
-  $("weight").value = key ? (key.orderWeight??50) : 50;
+  $("weight").value = src ? (src.orderWeight??50) : 50;
   updateWeight();
   keyDirty=false;
 }

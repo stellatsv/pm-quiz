@@ -47,5 +47,5 @@ Every answer is also kept as a row in the **Submissions** tab of your Google She
 ## Good to know
 - If you edit `Code.gs` later, redeploy with **Deploy → Manage deployments → Edit → Version: New version** so the URL stays the same.
 - To change the admin password, update `ADMIN_PASSWORD` in Script properties. No redeploy is needed.
-- If you change the phases, update `PHASES` in both `config.js` and `Code.gs`.
+- To add, remove or reorder phases, edit `PHASES` in `config.js` only, then re-save the answer key on the admin page. To rename a phase on screen without affecting saved data, use `PHASE_LABELS`.
 - The quiz is open to anyone with the link, and team choice is on the honour system.
