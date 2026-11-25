@@ -19,7 +19,7 @@ const HEADER = ["Submitted at", "Team", "Total days", "Browser ID", "Answer (JSO
   .concat(Array.from({ length: MAX_PHASES }, (_, i) => "Step " + (i + 1)));
 
 function doGet() {
-  return json({ ok: true, open: isOpen_() });
+  return json(status_());
 }
 
 function doPost(e) {
@@ -28,7 +28,7 @@ function doPost(e) {
   catch (err) { return json({ ok: false, error: "bad_request" }); }
 
   switch (req.action) {
-    case "status": return json({ ok: true, open: isOpen_() });
+    case "status": return json(status_());
     case "submit": return submit_(req);
   }
 
@@ -145,6 +145,11 @@ function checkPassword_(given) {
   cache.put("pw_fails", String(fails + 1), 600);
   Utilities.sleep(800);
   return "unauthorized";
+}
+
+// What every participant's phone checks: is the quiz open, and which round is running.
+function status_() {
+  return { ok: true, open: isOpen_(), round: Number(props_().getProperty("RESET_AT") || 0) };
 }
 
 function isOpen_() {

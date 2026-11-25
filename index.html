@@ -28,6 +28,7 @@
 
   <!-- 2. Play -->
   <section id="view-play" hidden>
+    <p class="msg" id="roundNote" hidden style="margin:0 0 12px;font-weight:700;color:var(--accent-text)"></p>
     <h2>Order the steps</h2>
     <p class="lede" style="margin-bottom:0">Drag the handle to move a step, or focus it and use the arrow keys. Enter the number of days next to each one.</p>
     <ol class="steps" id="steps"></ol>
@@ -47,7 +48,7 @@
     <h1>Answer <mark class="hl">submitted</mark></h1>
     <p class="lede" id="doneLede"></p>
     <ol class="summary" id="doneSummary"></ol>
-    <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button></div>
+    <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button><button class="secondary" id="againBtn">Play again</button></div>
   </section>
 
   <!-- 4. Closed -->
@@ -174,6 +175,15 @@ function renderDone(){
 }
 $("editBtn").onclick=()=>{ renderSteps(); show("play"); };
 
+// Clear this phone's answers: fresh shuffle, no days. Keeps the team and the person.
+function resetAnswers(note){
+  state.order=shuffle(PHASES.slice()); state.days={}; state.submitted=false; save();
+  setMsg($("submitMsg"),"");
+  setMsg($("roundNote"),note||"");
+  if(state.team){ renderSteps(); show("play"); } else { renderTeams(); show("team"); }
+}
+$("againBtn").onclick=()=>resetAnswers();
+
 /* ---------- Start ---------- */
 function route(){
   if(!state.team){ renderTeams(); show("team"); }
@@ -183,8 +193,25 @@ function route(){
 renderTeams();
 route();
 
-// Check whether the host has closed submissions.
-api({action:"status"}).then(r=>{ if(r.open===false) show("closed"); }).catch(()=>{});
+// Keep in step with the host: closed/reopened submissions, and new rounds.
+let wasClosed=false;
+async function checkStatus(){
+  try{
+    const r=await api({action:"status"});
+    if(typeof r.round==="number"){
+      if(state.round===undefined){ state.round=r.round; save(); }
+      else if(r.round!==state.round){
+        state.round=r.round; save();
+        resetAnswers("A new round has started, so your previous answers were cleared.");
+      }
+    }
+    if(r.open===false){ wasClosed=true; show("closed"); }
+    else if(wasClosed || !$("view-closed").hidden){ wasClosed=false; route(); }
+  }catch(e){}
+}
+checkStatus();
+setInterval(()=>{ if(document.visibilityState==="visible") checkStatus(); },20000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkStatus(); });
 </script>
 </body>
 </html>
