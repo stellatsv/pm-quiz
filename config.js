@@ -9,7 +9,7 @@ window.QUIZ_CONFIG = {
 
   // How a phase is shown on screen, if different from its name below.
   // Renaming here needs no change to the Apps Script.
-  PHASE_LABELS: { "Launch": "Launch Actions", "SD Creation": "Service Description Creation" },
+  PHASE_LABELS: { "Launch": "Launch Actions", "SD Creation": "Service Description Process" },
 
   // The phases participants put in order. If you change these, change PHASES in Code.gs too.
   PHASES: [
