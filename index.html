@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Project Delivery Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="bar">
+  <span class="brand">Delivery Quiz</span>
+  <button class="chip" id="teamChip" type="button" hidden></button>
+</div>
+
+<main>
+  <!-- 1. Team -->
+  <section id="view-team">
+    <h1>Put the launch in order</h1>
+    <p class="lede">Choose your team, then drag the eleven steps of a project delivery into the order they happen and estimate how many days each one takes.</p>
+    <h2>Which team are you on?</h2>
+    <ul class="teams" id="teamList"></ul>
+    <div class="actions"><button class="primary" id="startBtn" disabled>Start</button></div>
+  </section>
+
+  <!-- 2. Play -->
+  <section id="view-play" hidden>
+    <h2>Order the steps</h2>
+    <p class="lede" style="margin-bottom:0">Drag the handle to move a step, or focus it and use the arrow keys. Enter the number of days next to each one.</p>
+    <ol class="steps" id="steps"></ol>
+    <div class="foot">
+      <div class="totals">
+        <div class="total" id="total">0<small>days</small></div>
+        <div class="hint" id="hint"></div>
+      </div>
+      <div class="track" id="track" aria-hidden="true"></div>
+      <button class="primary" id="submitBtn" disabled>Submit answer</button>
+      <p class="msg" id="submitMsg" hidden></p>
+    </div>
+  </section>
+
+  <!-- 3. Done -->
+  <section id="view-done" hidden>
+    <h1>Answer submitted</h1>
+    <p class="lede" id="doneLede"></p>
+    <ol class="summary" id="doneSummary"></ol>
+    <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button></div>
+  </section>
+
+  <!-- 4. Closed -->
+  <section id="view-closed" hidden>
+    <h1>Submissions are closed</h1>
+    <p class="lede">The host has closed this round. Hang tight for the results.</p>
+  </section>
+</main>
+
+<script src="config.js"></script>
+<script src="shared.js"></script>
+<script>
+const { cfg, api, $, setMsg, summaryList } = window.Quiz;
+const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
+const STORE_KEY = "delivery-quiz-gh-v1";
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORE_KEY));
+    if(s && Array.isArray(s.order) && s.order.length===PHASES.length && PHASES.every(p=>s.order.includes(p))) return s;
+  }catch(e){}
+  return null;
+}
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} }
+function newId(){ return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2)); }
+
+let state = load() || { team:null, order:shuffle(PHASES.slice()), days:{}, clientId:newId() };
+if(!state.clientId){ state.clientId=newId(); }
+save();
+
+/* ---------- Views ---------- */
+function show(view){
+  for(const v of ["team","play","done","closed"]) $("view-"+v).hidden = v!==view;
+  $("teamChip").hidden = !state.team || view==="team" || view==="closed";
+  $("teamChip").textContent = state.team || "";
+  $("teamChip").setAttribute("aria-label", state.team ? `${state.team}. Change team` : "");
+  window.scrollTo(0,0);
+}
+$("teamChip").addEventListener("click",()=>{ renderTeams(); show("team"); });
+
+/* ---------- Team picker ---------- */
+function renderTeams(){
+  const ul=$("teamList"); ul.innerHTML="";
+  TEAMS.forEach(t=>{
+    const li=document.createElement("li"), b=document.createElement("button");
+    b.className="team"; b.type="button"; b.textContent=t; b.setAttribute("aria-pressed", String(state.team===t));
+    b.onclick=()=>{ state.team=t; save(); renderTeams(); };
+    li.appendChild(b); ul.appendChild(li);
+  });
+  $("startBtn").disabled=!state.team;
+}
+$("startBtn").onclick=()=>{ renderSteps(); show("play"); };
+
+/* ---------- Steps list ---------- */
+const GRIP='<svg viewBox="0 0 14 20" fill="currentColor"><circle cx="3" cy="3" r="2"/><circle cx="11" cy="3" r="2"/><circle cx="3" cy="10" r="2"/><circle cx="11" cy="10" r="2"/><circle cx="3" cy="17" r="2"/><circle cx="11" cy="17" r="2"/></svg>';
+
+function renderSteps(){
+  const ol=$("steps"); ol.innerHTML="";
+  state.order.forEach(phase=>{
+    const li=document.createElement("li"); li.className="step"; li.dataset.phase=phase;
+    li.innerHTML=`<button class="grip" type="button">${GRIP}</button><span class="num"></span><span class="name"></span><label class="days"><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off"><span>days</span></label>`;
+    li.querySelector(".name").textContent=phase;
+    const input=li.querySelector("input");
+    input.setAttribute("aria-label",`Days for ${phase}`);
+    input.value = state.days[phase] ?? "";
+    input.addEventListener("input",()=>{
+      input.value=input.value.replace(/\D/g,"").slice(0,3);
+      if(input.value==="") delete state.days[phase]; else state.days[phase]=parseInt(input.value,10);
+      save(); updateFooter();
+    });
+    const grip=li.querySelector(".grip");
+    grip.addEventListener("pointerdown",e=>startDrag(e,li,grip));
+    grip.addEventListener("keydown",e=>{
+      if(e.key==="ArrowUp" && li.previousElementSibling){ e.preventDefault(); ol.insertBefore(li,li.previousElementSibling); syncOrder(); grip.focus(); }
+      if(e.key==="ArrowDown" && li.nextElementSibling){ e.preventDefault(); ol.insertBefore(li.nextElementSibling,li); syncOrder(); grip.focus(); }
+    });
+    ol.appendChild(li);
+  });
+  renumber(); updateFooter();
+}
+function renumber(){
+  [...$("steps").children].forEach((li,i)=>{
+    li.querySelector(".num").textContent=i+1;
+    li.querySelector(".grip").setAttribute("aria-label",`Move ${li.dataset.phase}, currently step ${i+1} of ${PHASES.length}. Use the up and down arrow keys.`);
+  });
+}
+function syncOrder(){ state.order=[...$("steps").children].map(li=>li.dataset.phase); save(); renumber(); updateFooter(); }
+
+/* Pointer drag: mouse, touch and pen */
+let drag=null;
+function startDrag(e,li,grip){
+  if(e.button!==undefined && e.button!==0) return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  drag={li,grip,startY:e.clientY,id:e.pointerId};
+  li.classList.remove("settle"); li.classList.add("dragging");
+  grip.addEventListener("pointermove",onDrag);
+  grip.addEventListener("pointerup",endDrag);
+  grip.addEventListener("pointercancel",endDrag);
+}
+function onDrag(e){
+  if(!drag||e.pointerId!==drag.id) return;
+  const {li}=drag, ol=$("steps");
+  let dy=e.clientY-drag.startY;
+  li.style.transform=`translateY(${dy}px)`;
+  const r=li.getBoundingClientRect(), mid=r.top+r.height/2;
+  const next=li.nextElementSibling, prev=li.previousElementSibling;
+  const before=li.offsetTop;
+  if(next){ const nr=next.getBoundingClientRect(); if(mid>nr.top+nr.height/2) ol.insertBefore(next,li); }
+  if(prev){ const pr=prev.getBoundingClientRect(); if(mid<pr.top+pr.height/2) ol.insertBefore(li,prev); }
+  const after=li.offsetTop;
+  if(after!==before){ drag.startY+=after-before; dy=e.clientY-drag.startY; li.style.transform=`translateY(${dy}px)`; renumber(); }
+  const edge=70;
+  if(e.clientY<edge) window.scrollBy(0,-12); else if(e.clientY>window.innerHeight-edge-120) window.scrollBy(0,12);
+}
+function endDrag(){
+  if(!drag) return;
+  const {li,grip}=drag;
+  grip.removeEventListener("pointermove",onDrag);
+  grip.removeEventListener("pointerup",endDrag);
+  grip.removeEventListener("pointercancel",endDrag);
+  li.classList.add("settle"); li.classList.remove("dragging"); li.style.transform="";
+  drag=null; syncOrder();
+}
+
+/* ---------- Footer ---------- */
+function updateFooter(){
+  const vals=state.order.map(p=>state.days[p]);
+  const filled=vals.filter(v=>Number.isInteger(v)).length;
+  const total=vals.reduce((s,v)=>s+(Number.isInteger(v)?v:0),0);
+  $("total").innerHTML=`${total}<small>${total===1?"day":"days"} in total</small>`;
+  const missing=PHASES.length-filled;
+  $("hint").textContent = missing ? `Add days for ${missing} more ${missing===1?"step":"steps"}` : `About ${Math.round(total/5*10)/10} working weeks`;
+  const track=$("track"); track.innerHTML="";
+  const cols=["--seg1","--seg2","--seg3","--seg4"];
+  state.order.forEach((p,i)=>{
+    const v=state.days[p]; if(!v||!total) return;
+    const s=document.createElement("div"); s.className="seg";
+    s.style.width=(v/total*100)+"%"; s.style.background=`var(${cols[i%4]})`; s.title=`${i+1}. ${p}: ${v} days`;
+    track.appendChild(s);
+  });
+  $("submitBtn").disabled = missing>0;
+  document.querySelectorAll(".days input").forEach(inp=>inp.classList.toggle("empty",inp.value===""));
+}
+
+/* ---------- Submit ---------- */
+$("submitBtn").onclick=async()=>{
+  const btn=$("submitBtn"), msg=$("submitMsg");
+  const steps=state.order.map(p=>({phase:p,days:state.days[p]}));
+  btn.disabled=true; btn.textContent="Submitting…"; setMsg(msg,"");
+  try{
+    await api({action:"submit", team:state.team, steps, clientId:state.clientId});
+    state.submitted=true; save(); renderDone(); show("done");
+  }catch(err){
+    if(err.code==="closed"){ show("closed"); }
+    else if(err.code==="not_configured"){ setMsg(msg,"This quiz isn’t connected to its answer sheet yet. Ask the host to finish setup.",true); }
+    else { setMsg(msg,"The answer didn’t save. Check your connection and select Submit answer again.",true); }
+  }finally{ btn.textContent="Submit answer"; updateFooter(); }
+};
+
+function renderDone(){
+  const steps=state.order.map(p=>({phase:p,days:state.days[p]}));
+  const total=steps.reduce((s,x)=>s+x.days,0);
+  $("doneLede").textContent=`${state.team}’s answer is in: ${total} days end to end. You can change it until the host closes submissions; your latest answer is the one that counts.`;
+  summaryList($("doneSummary"),steps);
+}
+$("editBtn").onclick=()=>{ renderSteps(); show("play"); };
+
+/* ---------- Start ---------- */
+function route(){
+  if(!state.team){ renderTeams(); show("team"); }
+  else if(state.submitted){ renderDone(); show("done"); }
+  else { renderSteps(); show("play"); }
+}
+renderTeams();
+route();
+
+// Check whether the host has closed submissions.
+api({action:"status"}).then(r=>{ if(r.open===false) show("closed"); }).catch(()=>{});
+</script>
+</body>
+</html>

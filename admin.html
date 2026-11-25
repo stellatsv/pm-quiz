@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Quiz Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="bar">
+  <span class="brand">Delivery Quiz · Admin</span>
+  <button class="linkbtn" id="signOut" type="button" hidden>Sign out</button>
+</div>
+
+<main>
+  <!-- Login -->
+  <section id="view-login">
+    <h1>Host sign-in</h1>
+    <p class="lede">Enter the admin password to see answers, set the answer key and run rounds.</p>
+    <form class="login" id="loginForm">
+      <label for="pw" class="keyhead">Password</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit" id="loginBtn">Sign in</button>
+      <p class="msg" id="loginMsg" hidden></p>
+    </form>
+  </section>
+
+  <!-- Results -->
+  <section id="view-results" hidden>
+    <h2>Team answers</h2>
+    <p class="lede" id="resultsLede">Loading answers…</p>
+    <div class="toolbar">
+      <span class="status" id="statusLabel">Submissions open</span>
+      <button class="secondary" id="toggleOpen" type="button">Close submissions</button>
+      <button class="secondary" id="roundBtn" type="button">Start a new round</button>
+      <button class="secondary" id="refreshBtn" type="button">Refresh</button>
+    </div>
+    <p class="msg" id="resultsMsg" hidden></p>
+
+    <details class="card keypanel" id="keyPanel">
+      <summary>Answer key and scoring</summary>
+      <p class="rules" style="margin-top:12px">Set each phase’s correct position and number of days. Sequence: full credit in the right place, two-thirds one place off, one-third two places off. Days: credit falls in a straight line to zero at 100% off.</p>
+      <div class="keyrow keyhead"><span>Phase</span><span>Position</span><span>Days</span></div>
+      <div class="keyrows" id="keyRows"></div>
+      <label class="weight"><span>Balance: <output id="weightOut"></output></span><input type="range" id="weight" min="0" max="100" step="10" value="50"></label>
+      <button class="primary" id="saveKey" type="button">Save answer key</button>
+      <p class="msg" id="keyMsg" hidden></p>
+    </details>
+
+    <div id="board"></div>
+    <div class="results" id="results"></div>
+  </section>
+</main>
+
+<script src="config.js"></script>
+<script src="shared.js"></script>
+<script>
+const { cfg, api, $, setMsg, summaryList } = window.Quiz;
+const TEAMS = cfg.TEAMS, PHASES = cfg.PHASES;
+const PW_KEY = "delivery-quiz-admin-pw";
+
+let password = null, data = null, key = null, keyDirty = false, timer = null, roundArmed = false;
+try{ password = sessionStorage.getItem(PW_KEY); }catch(e){}
+
+function show(view){
+  $("view-login").hidden = view!=="login";
+  $("view-results").hidden = view!=="results";
+  $("signOut").hidden = view!=="results";
+}
+
+/* ---------- Sign in ---------- */
+$("loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const pw=$("pw").value, btn=$("loginBtn"), msg=$("loginMsg");
+  btn.disabled=true; btn.textContent="Signing in…"; setMsg(msg,"");
+  try{
+    data = await api({action:"results", password:pw});
+    password = pw; try{ sessionStorage.setItem(PW_KEY,pw); }catch(e){}
+    $("pw").value="";
+    enter();
+  }catch(err){
+    setMsg(msg, err.code==="unauthorized" ? "That password isn’t right." :
+               err.code==="not_configured" ? "Add your Apps Script URL to config.js first." :
+               err.code==="no_password" ? "No admin password is set yet. Add ADMIN_PASSWORD in the Apps Script project’s Script properties." :
+               "Couldn’t reach the answer sheet. Check your connection and try again.", true);
+  }finally{ btn.disabled=false; btn.textContent="Sign in"; }
+});
+$("signOut").onclick=()=>{
+  password=null; data=null; key=null; clearInterval(timer);
+  try{ sessionStorage.removeItem(PW_KEY); }catch(e){}
+  show("login");
+};
+
+function enter(){
+  show("results");
+  applyData();
+  clearInterval(timer);
+  timer=setInterval(()=>refresh(true),15000);
+}
+
+async function refresh(quiet){
+  if(!password) return;
+  const btn=$("refreshBtn");
+  if(!quiet){ btn.disabled=true; btn.textContent="Refreshing…"; }
+  try{
+    data = await api({action:"results", password});
+    setMsg($("resultsMsg"),"");
+    applyData();
+  }catch(err){
+    if(err.code==="unauthorized"){ $("signOut").onclick(); setMsg($("loginMsg"),"The admin password changed. Sign in again.",true); return; }
+    setMsg($("resultsMsg"),"Couldn’t load the latest answers. They’ll update when the connection returns.",true);
+  }finally{ if(!quiet){ btn.disabled=false; btn.textContent="Refresh"; } }
+}
+$("refreshBtn").onclick=()=>refresh(false);
+
+function applyData(){
+  key = data.key || null;
+  if(!keyDirty) renderKeyForm();
+  if(!key) $("keyPanel").open = true;
+  const open = data.open !== false;
+  $("statusLabel").textContent = open ? "Submissions open" : "Submissions closed";
+  $("statusLabel").classList.toggle("closed", !open);
+  $("toggleOpen").textContent = open ? "Close submissions" : "Reopen submissions";
+  renderResults();
+}
+
+/* ---------- Open / close and rounds ---------- */
+$("toggleOpen").onclick=async()=>{
+  const b=$("toggleOpen"), open=data.open!==false;
+  b.disabled=true;
+  try{ await api({action:"setOpen", password, open:!open}); await refresh(true); }
+  catch(e){ setMsg($("resultsMsg"),"That change didn’t save. Try again.",true); }
+  finally{ b.disabled=false; }
+};
+$("roundBtn").onclick=async()=>{
+  const b=$("roundBtn");
+  if(!roundArmed){ roundArmed=true; b.textContent="Select again to clear the board"; setTimeout(()=>{ roundArmed=false; b.textContent="Start a new round"; },4000); return; }
+  roundArmed=false; b.textContent="Start a new round"; b.disabled=true;
+  try{ await api({action:"newRound", password}); await refresh(true); }
+  catch(e){ setMsg($("resultsMsg"),"The new round didn’t start. Try again.",true); }
+  finally{ b.disabled=false; }
+};
+
+/* ---------- Scoring ---------- */
+function scoreSub(s,k){
+  const steps=s.steps||[], n=k.order.length;
+  let o=0,d=0;
+  steps.forEach((st,gi)=>{
+    const ci=k.order.indexOf(st.phase); if(ci<0) return;
+    o+=Math.max(0,1-Math.abs(gi-ci)/3);
+    const c=k.days[st.phase], g=st.days;
+    d+= c===0 ? (g===0?1:0) : Math.max(0,1-Math.abs(g-c)/c);
+  });
+  const orderPct=o/n*100, daysPct=d/n*100, w=(k.orderWeight??50)/100;
+  return {orderPct,daysPct,total:w*orderPct+(1-w)*daysPct};
+}
+
+/* ---------- Answer key form ---------- */
+function renderKeyForm(){
+  const rows=$("keyRows"); rows.innerHTML="";
+  PHASES.forEach((p,i)=>{
+    const pos = key && key.order.includes(p) ? key.order.indexOf(p)+1 : i+1;
+    const days = key && Number.isInteger(key.days[p]) ? key.days[p] : "";
+    const row=document.createElement("div"); row.className="keyrow"; row.dataset.phase=p;
+    row.innerHTML=`<span class="name"></span><select></select><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3">`;
+    row.querySelector(".name").textContent=p;
+    const sel=row.querySelector("select");
+    for(let n=1;n<=PHASES.length;n++){ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===pos) o.selected=true; sel.appendChild(o); }
+    sel.setAttribute("aria-label",`Correct position for ${p}`);
+    const inp=row.querySelector("input"); inp.value=days; inp.setAttribute("aria-label",`Correct days for ${p}`);
+    inp.addEventListener("input",()=>{ inp.value=inp.value.replace(/\D/g,"").slice(0,3); keyDirty=true; });
+    sel.addEventListener("change",()=>{ keyDirty=true; });
+    rows.appendChild(row);
+  });
+  $("weight").value = key ? (key.orderWeight??50) : 50;
+  updateWeight();
+  keyDirty=false;
+}
+function updateWeight(){ const w=+$("weight").value; $("weightOut").textContent=`sequence ${w}%, days ${100-w}%`; }
+$("weight").addEventListener("input",()=>{ updateWeight(); keyDirty=true; });
+
+$("saveKey").onclick=async()=>{
+  const msg=$("keyMsg"), rows=[...$("keyRows").children];
+  const pos=rows.map(r=>+r.querySelector("select").value);
+  if(new Set(pos).size!==PHASES.length){
+    setMsg(msg,`Each position can be used once. Check positions ${[...new Set(pos.filter((v,i)=>pos.indexOf(v)!==i))].join(", ")}.`,true); return;
+  }
+  const days={}, missing=[];
+  rows.forEach(r=>{ const v=r.querySelector("input").value; if(v==="") missing.push(r.dataset.phase); else days[r.dataset.phase]=parseInt(v,10); });
+  if(missing.length){ setMsg(msg,`Add days for ${missing.join(", ")}.`,true); return; }
+  const order=rows.map((r,i)=>({p:r.dataset.phase,pos:pos[i]})).sort((a,b)=>a.pos-b.pos).map(x=>x.p);
+  const btn=$("saveKey"); btn.disabled=true; btn.textContent="Saving…";
+  try{
+    await api({action:"saveKey", password, key:{order,days,orderWeight:+$("weight").value}});
+    keyDirty=false; setMsg(msg,"Answer key saved. Scores below are updated.");
+    await refresh(true);
+  }catch(e){ setMsg(msg,"The answer key didn’t save. Try again.",true); }
+  finally{ btn.disabled=false; btn.textContent="Save answer key"; }
+};
+
+/* ---------- Results ---------- */
+function scoredList(el,s,k){
+  el.innerHTML=""; el.classList.add("scored");
+  (s.steps||[]).forEach((st,i)=>{
+    const ci=k.order.indexOf(st.phase)+1, c=k.days[st.phase];
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="n">${i+1}</span><span></span><span class="d"></span><span class="ans"></span>`;
+    li.children[1].textContent=st.phase;
+    li.children[2].textContent=`${st.days} d`;
+    const a=li.children[3];
+    a.textContent=`answer: #${ci}, ${c} d`;
+    if(ci===i+1 && c===st.days) a.classList.add("ok");
+    el.appendChild(li);
+  });
+}
+
+function renderResults(){
+  const box=$("results"), board=$("board"); box.innerHTML=""; board.innerHTML="";
+  const subs=(data && data.submissions)||[];
+  const byTeam={};
+  subs.forEach(s=>{ (byTeam[s.team]=byTeam[s.team]||[]).push(s); });
+  const teams=TEAMS.filter(t=>byTeam[t]).concat(Object.keys(byTeam).filter(t=>!TEAMS.includes(t)));
+  $("resultsLede").textContent=`${teams.length} of ${TEAMS.length} teams have answered. Updates every 15 seconds.`;
+  if(!teams.length){ box.innerHTML='<div class="empty-state">No answers yet this round. Share the quiz link with the teams to get started.</div>'; return; }
+
+  const latest=teams.map(t=>{
+    const list=byTeam[t].sort((a,b)=>b.submittedAt-a.submittedAt);
+    return {t,list,s:list[0],sc:key?scoreSub(list[0],key):null};
+  });
+
+  if(key){
+    latest.sort((a,b)=>b.sc.total-a.sc.total || a.s.submittedAt-b.s.submittedAt);
+    const wrap=document.createElement("div"); wrap.className="boardwrap";
+    const tbl=document.createElement("table"); tbl.className="board";
+    tbl.innerHTML=`<thead><tr><th class="t">#</th><th class="t">Team</th><th>Score</th><th>Sequence</th><th>Days</th><th>Total days</th></tr></thead><tbody></tbody>`;
+    latest.forEach((x,i)=>{
+      const tr=document.createElement("tr"); if(i===0) tr.className="first";
+      tr.innerHTML=`<td class="rank">${i+1}</td><td class="t"></td><td class="score">${x.sc.total.toFixed(1)}</td><td>${Math.round(x.sc.orderPct)}%</td><td>${Math.round(x.sc.daysPct)}%</td><td>${x.s.total}</td>`;
+      tr.children[1].textContent=x.t;
+      tbl.tBodies[0].appendChild(tr);
+    });
+    wrap.appendChild(tbl); board.appendChild(wrap);
+  } else {
+    board.innerHTML='<div class="empty-state" style="margin-top:20px">Add the answer key above to score and rank the teams.</div>';
+  }
+
+  latest.forEach(({t,list,s,sc})=>{
+    const card=document.createElement("article"); card.className="card";
+    card.innerHTML=`<header><h3></h3><span class="meta"></span></header><p class="meta" style="margin:4px 0 0"></p><ol class="summary"></ol>`;
+    card.querySelector("h3").textContent=t;
+    const hm=card.querySelector("header .meta");
+    if(sc){ hm.className="score-pill"; hm.textContent=`${sc.total.toFixed(1)} points`; } else hm.textContent=`${s.total} days in total`;
+    const when=new Date(s.submittedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+    card.querySelector("p.meta").textContent=`Submitted at ${when}`+(list.length>1?`. Showing the latest of ${list.length} answers from this team.`:"");
+    if(key) scoredList(card.querySelector("ol"),s,key); else summaryList(card.querySelector("ol"),s.steps||[]);
+    box.appendChild(card);
+  });
+}
+
+/* ---------- Start ---------- */
+if(password){
+  show("results");
+  api({action:"results", password}).then(d=>{ data=d; enter(); })
+    .catch(()=>{ password=null; try{ sessionStorage.removeItem(PW_KEY); }catch(e){} show("login"); });
+} else show("login");
+</script>
+</body>
+</html>
