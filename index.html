@@ -48,7 +48,7 @@
     <h1>Answer <mark class="hl">submitted</mark></h1>
     <p class="lede" id="doneLede"></p>
     <ol class="summary" id="doneSummary"></ol>
-    <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button><button class="secondary" id="againBtn">Play again</button></div>
+    <div class="actions"><button class="secondary" id="editBtn">Edit and resubmit</button></div>
   </section>
 
   <!-- 4. Closed -->
@@ -204,7 +204,6 @@ function resetAnswers(note){
   setMsg($("roundNote"),note||"");
   if(state.team){ renderSteps(); show("play"); } else { renderTeams(); show("team"); }
 }
-$("againBtn").onclick=()=>resetAnswers();
 
 /* ---------- Results ---------- */
 function renderResults(k){
